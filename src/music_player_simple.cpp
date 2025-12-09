@@ -27,11 +27,20 @@ private:
     std::vector<float> audio_buffer_;
     bool is_playing_;
     WAVEFORMATEXTENSIBLE wave_format_;
+    static bool com_initialized_;
 
 public:
     SimpleMusicPlayer() : enumerator_(nullptr), device_(nullptr), client_(nullptr),
                           render_client_(nullptr), audio_event_(nullptr), is_playing_(false) {
-        COMInitializer();
+        if (!com_initialized_) {
+            HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+            com_initialized_ = SUCCEEDED(hr);
+            if (com_initialized_) {
+                std::cout << "✓ COM initialized" << std::endl;
+            } else {
+                std::cerr << "✗ Failed to initialize COM: 0x" << std::hex << hr << std::endl;
+            }
+        }
     }
 
     ~SimpleMusicPlayer() {
@@ -39,10 +48,12 @@ public:
         cleanup();
     }
 
-    struct COMInitializer {
-        COMInitializer() { CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED); }
-        ~COMInitializer() { CoUninitialize(); }
-    };
+    static void CleanupCOM() {
+        if (com_initialized_) {
+            CoUninitialize();
+            com_initialized_ = false;
+        }
+    }
 
     bool load_wav_file(const std::string& filename) {
         std::cout << "Loading WAV file: " << filename << std::endl;
@@ -126,17 +137,32 @@ public:
     }
 
     bool initialize_audio() {
+        std::cout << "Initializing audio system..." << std::endl;
+
         HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
                                      CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
                                      reinterpret_cast<void**>(&enumerator_));
-        if (FAILED(hr)) return false;
+        if (FAILED(hr)) {
+            std::cerr << "Failed to create device enumerator: 0x" << std::hex << hr << std::endl;
+            return false;
+        }
 
         hr = enumerator_->GetDefaultAudioEndpoint(eRender, eConsole, &device_);
-        if (FAILED(hr)) return false;
+        if (FAILED(hr)) {
+            std::cerr << "Failed to get default audio endpoint: 0x" << std::hex << hr << std::endl;
+            return false;
+        }
+
+        std::cout << "✓ Audio device obtained" << std::endl;
 
         hr = device_->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
                               reinterpret_cast<void**>(&client_));
-        if (FAILED(hr)) return false;
+        if (FAILED(hr)) {
+            std::cerr << "Failed to activate audio client: 0x" << std::hex << hr << std::endl;
+            return false;
+        }
+
+        std::cout << "✓ Audio client activated" << std::endl;
 
         // Set up WAVE_FORMAT_EXTENSIBLE (stage 1 fix from analyst report)
         wave_format_.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
@@ -150,6 +176,8 @@ public:
         wave_format_.Samples.wValidBitsPerSample = 32;
         wave_format_.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
 
+        std::cout << "✓ Audio format configured: 48kHz/32-bit float stereo" << std::endl;
+
         // Initialize with REFERENCE_TIME buffer
         REFERENCE_TIME buffer_duration = 100000; // 10ms in 100-nanosecond units
         hr = client_->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
@@ -159,17 +187,33 @@ public:
             return false;
         }
 
+        std::cout << "✓ Audio client initialized" << std::endl;
+
         // Create event handle
         audio_event_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-        if (!audio_event_) return false;
+        if (!audio_event_) {
+            std::cerr << "Failed to create audio event" << std::endl;
+            return false;
+        }
+
+        std::cout << "✓ Audio event created" << std::endl;
 
         hr = client_->SetEventHandle(audio_event_);
-        if (FAILED(hr)) return false;
+        if (FAILED(hr)) {
+            std::cerr << "Failed to set event handle: 0x" << std::hex << hr << std::endl;
+            return false;
+        }
+
+        std::cout << "✓ Event handle set" << std::endl;
 
         hr = client_->GetService(__uuidof(IAudioRenderClient), reinterpret_cast<void**>(&render_client_));
-        if (FAILED(hr)) return false;
+        if (FAILED(hr)) {
+            std::cerr << "Failed to get render client: 0x" << std::hex << hr << std::endl;
+            return false;
+        }
 
-        std::cout << "Audio initialized successfully: 48kHz/32-bit float stereo" << std::endl;
+        std::cout << "✓ Render client obtained" << std::endl;
+        std::cout << "✓ Audio initialization completed successfully!" << std::endl;
         return true;
     }
 
@@ -271,6 +315,9 @@ private:
         }
     }
 };
+
+// Define static member
+bool SimpleMusicPlayer::com_initialized_ = false;
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
