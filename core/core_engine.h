@@ -4,6 +4,8 @@
 #include "event_bus.h"
 #include "plugin_host.h"
 #include "config_manager.h"
+#include "playlist_manager.h"
+#include "visualization_engine.h"
 #include <memory>
 #include <string>
 
@@ -45,6 +47,16 @@ public:
         return config_manager_.get();
     }
     
+    // Get playlist manager
+    PlaylistManager* get_playlist_manager() {
+        return playlist_manager_.get();
+    }
+    
+    // Get visualization engine
+    VisualizationEngine* get_visualization_engine() {
+        return visualization_engine_.get();
+    }
+    
     // Check if initialized
     bool is_initialized() const {
         return initialized_;
@@ -55,6 +67,8 @@ private:
     std::unique_ptr<EventBus> event_bus_;
     std::unique_ptr<PluginHost> plugin_host_;
     std::unique_ptr<ConfigManager> config_manager_;
+    std::unique_ptr<PlaylistManager> playlist_manager_;
+    std::unique_ptr<VisualizationEngine> visualization_engine_;
     
     bool initialized_;
 };

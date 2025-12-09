@@ -1,4 +1,7 @@
 # Plugins CMakeLists.txt
 
-# WAV Decoder Plugin
+# Decoder Plugins
 add_subdirectory(decoders)
+
+# DSP Plugins
+add_subdirectory(dsp)

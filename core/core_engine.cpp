@@ -31,6 +31,26 @@ Result CoreEngine::initialize() {
     config_manager_->initialize(config_path);
     config_manager_->set_auto_save(true);
     
+    // Create playlist manager
+    playlist_manager_ = std::make_unique<PlaylistManager>();
+    std::string config_dir = "."; // Use current directory for now
+    playlist_manager_->initialize(config_dir.c_str());
+    
+    // Create visualization engine
+    visualization_engine_ = std::make_unique<VisualizationEngine>();
+    VisualizationConfig viz_config{};
+    viz_config.waveform_width = 800;
+    viz_config.waveform_time_span = 5.0f;
+    viz_config.fft_size = 2048;
+    viz_config.spectrum_bars = 30;
+    viz_config.spectrum_min_freq = 20.0f;
+    viz_config.spectrum_max_freq = 20000.0f;
+    viz_config.spectrum_smoothing = 0.75f;
+    viz_config.vu_peak_decay_rate = 10.0f;
+    viz_config.vu_rms_window_ms = 100.0f;
+    viz_config.update_rate_hz = 60;
+    visualization_engine_->initialize(viz_config);
+    
     // Create plugin host
     plugin_host_ = std::make_unique<PluginHost>(service_registry_.get());
     
@@ -38,6 +58,8 @@ Result CoreEngine::initialize() {
     service_registry_->register_service(SERVICE_EVENT_BUS, event_bus_.get());
     service_registry_->register_service(SERVICE_PLUGIN_HOST, plugin_host_.get());
     service_registry_->register_service(SERVICE_CONFIG_MANAGER, config_manager_.get());
+    service_registry_->register_service(SERVICE_PLAYLIST_MANAGER, playlist_manager_.get());
+    service_registry_->register_service(SERVICE_VISUALIZATION, visualization_engine_.get());
     
     // Start event bus
     event_bus_->start();
@@ -71,9 +93,21 @@ void CoreEngine::shutdown() {
         config_manager_->shutdown();
     }
     
+    // Shutdown playlist manager (saves all playlists)
+    if (playlist_manager_) {
+        playlist_manager_->shutdown();
+    }
+    
+    // Shutdown visualization engine
+    if (visualization_engine_) {
+        visualization_engine_->shutdown();
+    }
+    
     // Cleanup
     plugin_host_.reset();
     event_bus_.reset();
+    visualization_engine_.reset();
+    playlist_manager_.reset();
     config_manager_.reset();
     service_registry_.reset();
     

@@ -1,10 +1,17 @@
 #include "core_engine.h"
+#include "audio_output_factory.h"
 #include <iostream>
 #include <csignal>
 #include <atomic>
 #include <thread>
 #include <chrono>
 #include <cstdlib>
+#include <cmath>
+#include <filesystem>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // Global running flag for signal handling
 static std::atomic<bool> g_running(true);
@@ -45,9 +52,14 @@ int main(int argc, char** argv) {
         // Try build directory first, then installation directory
         plugin_dir = "build/lib";
         
-        // Check if directory exists
-        if (access(plugin_dir, F_OK) != 0) {
+        // Check if directory exists using C++17 filesystem
+        namespace fs = std::filesystem;
+        if (!fs::exists(plugin_dir) || !fs::is_directory(plugin_dir)) {
+#ifdef _WIN32
+            plugin_dir = "C:/Program Files/Music Player/plugins";
+#else
             plugin_dir = "/usr/local/lib/music-player/plugins";
+#endif
         }
     }
     
@@ -110,6 +122,91 @@ int main(int argc, char** argv) {
         std::cout << "  Sample rate: " << sample_rate << " Hz" << std::endl;
         std::cout << "  Gapless playback: " << (gapless ? "enabled" : "disabled") << std::endl;
         std::cout << "  Configuration will be auto-saved on exit" << std::endl;
+        std::cout << std::endl;
+    }
+    
+    // Test platform audio output
+    std::cout << "Testing Platform Audio Output..." << std::endl;
+    mp::IAudioOutput* audio_output = mp::platform::create_platform_audio_output();
+    if (audio_output) {
+        // Enumerate devices
+        const mp::AudioDeviceInfo* devices = nullptr;
+        size_t device_count = 0;
+        mp::Result result = audio_output->enumerate_devices(&devices, &device_count);
+        
+        if (result == mp::Result::Success && device_count > 0) {
+            std::cout << "  Found " << device_count << " audio device(s):" << std::endl;
+            for (size_t i = 0; i < device_count; ++i) {
+                std::cout << "    - " << devices[i].name 
+                          << " (" << devices[i].max_channels << " channels, "
+                          << devices[i].default_sample_rate << " Hz)" << std::endl;
+            }
+            
+            // Test audio playback with a simple sine wave (440 Hz A note)
+            std::cout << "  Testing audio playback (2 second 440 Hz tone)..." << std::endl;
+            
+            struct AudioContext {
+                float phase = 0.0f;
+                float frequency = 440.0f; // A note
+                float sample_rate = 44100.0f;
+            };
+            
+            AudioContext audio_ctx;
+            
+            auto audio_callback = [](void* buffer, size_t frames, void* user_data) {
+                AudioContext* ctx = static_cast<AudioContext*>(user_data);
+                float* output = static_cast<float*>(buffer);
+                
+                float phase_increment = 2.0f * static_cast<float>(M_PI) * ctx->frequency / ctx->sample_rate;
+                
+                for (size_t i = 0; i < frames; ++i) {
+                    float sample = 0.3f * std::sin(ctx->phase); // 30% volume
+                    output[i * 2] = sample;     // Left channel
+                    output[i * 2 + 1] = sample; // Right channel
+                    
+                    ctx->phase += phase_increment;
+                    if (ctx->phase > 2.0f * static_cast<float>(M_PI)) {
+                        ctx->phase -= 2.0f * static_cast<float>(M_PI);
+                    }
+                }
+            };
+            
+            mp::AudioOutputConfig audio_config = {};
+            audio_config.device_id = nullptr; // Use default device
+            audio_config.sample_rate = 44100;
+            audio_config.channels = 2;
+            audio_config.format = mp::SampleFormat::Float32;
+            audio_config.buffer_frames = 1024;
+            audio_config.callback = audio_callback;
+            audio_config.user_data = &audio_ctx;
+            
+            audio_ctx.sample_rate = static_cast<float>(audio_config.sample_rate);
+            
+            result = audio_output->open(audio_config);
+            if (result == mp::Result::Success) {
+                std::cout << "  Audio device opened successfully" << std::endl;
+                std::cout << "  Latency: " << audio_output->get_latency() << " ms" << std::endl;
+                
+                result = audio_output->start();
+                if (result == mp::Result::Success) {
+                    std::cout << "  Playback started..." << std::endl;
+                    std::this_thread::sleep_for(std::chrono::seconds(2));
+                    
+                    audio_output->stop();
+                    std::cout << "  Playback stopped" << std::endl;
+                } else {
+                    std::cout << "  Failed to start playback" << std::endl;
+                }
+                
+                audio_output->close();
+            } else {
+                std::cout << "  Failed to open audio device" << std::endl;
+            }
+        } else {
+            std::cout << "  No audio devices found or enumeration failed" << std::endl;
+        }
+        
+        delete audio_output;
         std::cout << std::endl;
     }
     

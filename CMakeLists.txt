@@ -75,6 +75,17 @@ target_link_libraries(music-player
         Threads::Threads
 )
 
+# Test WASAPI executable
+add_executable(test-wasapi
+    src/test_wasapi.cpp
+)
+
+target_link_libraries(test-wasapi
+    PRIVATE
+        platform_abstraction
+        Threads::Threads
+)
+
 # Install targets
 install(TARGETS music-player
     RUNTIME DESTINATION bin

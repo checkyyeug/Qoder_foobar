@@ -6,6 +6,8 @@ add_library(core_engine STATIC
     plugin_host.cpp
     config_manager.cpp
     playback_engine.cpp
+    playlist_manager.cpp
+    visualization_engine.cpp
 )
 
 target_include_directories(core_engine
@@ -22,9 +24,17 @@ target_link_libraries(core_engine
         Threads::Threads
 )
 
-# Set compile options
-target_compile_options(core_engine PRIVATE
-    -Wall -Wextra
-    $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-O3>
-)
+# Set compile options (platform-specific)
+if(MSVC)
+    target_compile_options(core_engine PRIVATE
+        /W4
+        $<$<CONFIG:Debug>:/Od>
+        $<$<CONFIG:Release>:/O2>
+    )
+else()
+    target_compile_options(core_engine PRIVATE
+        -Wall -Wextra
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3>
+    )
+endif()

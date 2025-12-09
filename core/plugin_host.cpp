@@ -1,10 +1,17 @@
 #include "plugin_host.h"
-#include <dlfcn.h>
-#include <dirent.h>
-#include <sys/stat.h>
+
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <dlfcn.h>
+    #include <dirent.h>
+    #include <sys/stat.h>
+#endif
+
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <filesystem>
 
 namespace mp {
 namespace core {
@@ -18,32 +25,45 @@ PluginHost::~PluginHost() {
 }
 
 Result PluginHost::scan_directory(const char* directory) {
-    DIR* dir = opendir(directory);
-    if (!dir) {
-        return Result::FileNotFound;
-    }
+    namespace fs = std::filesystem;
     
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        if (entry->d_type != DT_REG) {
-            continue;
+    try {
+        if (!fs::exists(directory) || !fs::is_directory(directory)) {
+            return Result::FileNotFound;
         }
         
-        const char* name = entry->d_name;
-        size_t len = strlen(name);
-        
-        // Check for .so extension
-        if (len < 3 || strcmp(name + len - 3, ".so") != 0) {
-            continue;
+        for (const auto& entry : fs::directory_iterator(directory)) {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+            
+            std::string ext = entry.path().extension().string();
+            // Convert to lowercase for comparison
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            
+            // Check for plugin extension
+#ifdef _WIN32
+            if (ext != ".dll") {
+                continue;
+            }
+#elif defined(__APPLE__)
+            if (ext != ".dylib") {
+                continue;
+            }
+#else
+            if (ext != ".so") {
+                continue;
+            }
+#endif
+            
+            // Try to load the plugin
+            load_plugin(entry.path().string().c_str());
         }
-        
-        std::string path = std::string(directory) + "/" + name;
-        
-        // Try to load the plugin
-        load_plugin(path.c_str());
+    } catch (const std::exception& e) {
+        std::cerr << "Error scanning plugin directory: " << e.what() << std::endl;
+        return Result::Error;
     }
     
-    closedir(dir);
     return Result::Success;
 }
 
@@ -51,13 +71,22 @@ Result PluginHost::load_plugin(const char* path) {
     void* handle = load_library(path);
     if (!handle) {
         std::cerr << "Failed to load plugin library: " << path << std::endl;
+#ifdef _WIN32
+        DWORD error = GetLastError();
+        std::cerr << "  Error code: " << error << std::endl;
+#else
         std::cerr << "  Error: " << dlerror() << std::endl;
+#endif
         return Result::Error;
     }
     
     // Get plugin entry point
     typedef IPlugin* (*CreatePluginFunc)();
+#ifdef _WIN32
+    CreatePluginFunc create_plugin = (CreatePluginFunc)GetProcAddress((HMODULE)handle, "create_plugin");
+#else
     CreatePluginFunc create_plugin = (CreatePluginFunc)dlsym(handle, "create_plugin");
+#endif
     
     if (!create_plugin) {
         std::cerr << "Plugin missing create_plugin export: " << path << std::endl;
@@ -87,7 +116,11 @@ Result PluginHost::load_plugin(const char* path) {
                   << "." << API_VERSION.minor << std::endl;
         
         typedef void (*DestroyPluginFunc)(IPlugin*);
+#ifdef _WIN32
+        DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)GetProcAddress((HMODULE)handle, "destroy_plugin");
+#else
         DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)dlsym(handle, "destroy_plugin");
+#endif
         if (destroy_plugin) {
             destroy_plugin(plugin);
         }
@@ -100,7 +133,11 @@ Result PluginHost::load_plugin(const char* path) {
         std::cerr << "Plugin with duplicate UUID: " << info.uuid << std::endl;
         
         typedef void (*DestroyPluginFunc)(IPlugin*);
+#ifdef _WIN32
+        DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)GetProcAddress((HMODULE)handle, "destroy_plugin");
+#else
         DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)dlsym(handle, "destroy_plugin");
+#endif
         if (destroy_plugin) {
             destroy_plugin(plugin);
         }
@@ -146,7 +183,11 @@ Result PluginHost::unload_plugin(const char* uuid) {
     
     // Destroy plugin instance
     typedef void (*DestroyPluginFunc)(IPlugin*);
+#ifdef _WIN32
+    DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)GetProcAddress((HMODULE)loaded.library_handle, "destroy_plugin");
+#else
     DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)dlsym(loaded.library_handle, "destroy_plugin");
+#endif
     if (destroy_plugin) {
         destroy_plugin(loaded.plugin);
     }
@@ -188,7 +229,11 @@ void PluginHost::shutdown_plugins() {
             it->plugin->shutdown();
             
             typedef void (*DestroyPluginFunc)(IPlugin*);
+#ifdef _WIN32
+            DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)GetProcAddress((HMODULE)it->library_handle, "destroy_plugin");
+#else
             DestroyPluginFunc destroy_plugin = (DestroyPluginFunc)dlsym(it->library_handle, "destroy_plugin");
+#endif
             if (destroy_plugin) {
                 destroy_plugin(it->plugin);
             }
@@ -213,12 +258,20 @@ IPlugin* PluginHost::get_plugin(const char* uuid) {
 }
 
 void* PluginHost::load_library(const char* path) {
+#ifdef _WIN32
+    return (void*)LoadLibraryA(path);
+#else
     return dlopen(path, RTLD_NOW | RTLD_LOCAL);
+#endif
 }
 
 void PluginHost::unload_library(void* handle) {
     if (handle) {
+#ifdef _WIN32
+        FreeLibrary((HMODULE)handle);
+#else
         dlclose(handle);
+#endif
     }
 }
 

@@ -13,12 +13,16 @@ target_link_libraries(plugin_wav_decoder
         sdk_headers
 )
 
-# Set compile options
-target_compile_options(plugin_wav_decoder PRIVATE
-    -Wall -Wextra
-    $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-O3>
-)
+# Set compile options (platform-specific)
+if(MSVC)
+    target_compile_options(plugin_wav_decoder PRIVATE /W4)
+else()
+    target_compile_options(plugin_wav_decoder PRIVATE
+        -Wall -Wextra
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3>
+    )
+endif()
 
 # Don't add 'lib' prefix to plugin
 set_target_properties(plugin_wav_decoder PROPERTIES
@@ -60,13 +64,52 @@ else()
     message(WARNING "FLAC library not found, FLAC decoder will be stub only")
 endif()
 
-target_compile_options(plugin_flac_decoder PRIVATE
-    -Wall -Wextra
-    $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-O3>
-)
+# Set compile options (platform-specific)
+if(MSVC)
+    target_compile_options(plugin_flac_decoder PRIVATE /W4)
+else()
+    target_compile_options(plugin_flac_decoder PRIVATE
+        -Wall -Wextra
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3>
+    )
+endif()
 
 set_target_properties(plugin_flac_decoder PROPERTIES
     PREFIX ""
     OUTPUT_NAME "flac_decoder"
 )
+
+# MP3 Decoder Plugin (using minimp3 header-only library)
+add_library(plugin_mp3_decoder SHARED
+    mp3_decoder.cpp
+)
+
+target_include_directories(plugin_mp3_decoder
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/sdk/headers
+        ${CMAKE_SOURCE_DIR}/sdk/external/minimp3
+)
+
+target_link_libraries(plugin_mp3_decoder
+    PRIVATE
+        sdk_headers
+)
+
+# Set compile options (platform-specific)
+if(MSVC)
+    target_compile_options(plugin_mp3_decoder PRIVATE /W4)
+else()
+    target_compile_options(plugin_mp3_decoder PRIVATE
+        -Wall -Wextra
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3>
+    )
+endif()
+
+set_target_properties(plugin_mp3_decoder PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "mp3_decoder"
+)
+
+message(STATUS "Building MP3 decoder plugin with minimp3 (header-only library)")

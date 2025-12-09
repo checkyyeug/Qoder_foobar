@@ -136,6 +136,8 @@ constexpr ServiceID hash_string(const char* str) {
 constexpr ServiceID SERVICE_PLUGIN_HOST = hash_string("mp.service.plugin_host");
 constexpr ServiceID SERVICE_EVENT_BUS = hash_string("mp.service.event_bus");
 constexpr ServiceID SERVICE_CONFIG_MANAGER = hash_string("mp.service.config_manager");
+constexpr ServiceID SERVICE_PLAYLIST_MANAGER = hash_string("mp.service.playlist_manager");
+constexpr ServiceID SERVICE_VISUALIZATION = hash_string("mp.service.visualization");
 constexpr ServiceID SERVICE_AUDIO_OUTPUT = hash_string("mp.service.audio_output");
 constexpr ServiceID SERVICE_RESOURCE_MANAGER = hash_string("mp.service.resource_manager");
 

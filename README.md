@@ -5,13 +5,14 @@ A cross-platform, professional music player with extensible plugin architecture,
 ## Features
 
 - **Microkernel Architecture**: Minimal core with extensive plugin ecosystem
-- **Cross-Platform**: Windows, macOS, and Linux support
+- **Cross-Platform**: Windows (WASAPI), macOS, and Linux (ALSA) support
 - **Foobar2000 Compatibility**: Load and use existing foobar2000 plugins
 - **GPU Acceleration**: Modern GPU-accelerated UI and visualizations using Skia/Vulkan
 - **Professional Audio**: High-quality audio processing with low latency
 - **Extensible**: Plugin-based architecture for decoders, DSP, UI components
 - **Configuration Management**: JSON-based configuration with auto-save and schema versioning
 - **Gapless Playback**: Designed for seamless track transitions (implementation in progress)
+- **Windows Audio**: Native WASAPI support with automatic format negotiation
 
 ## Building
 
@@ -41,6 +42,26 @@ make -j$(nproc)
 
 # Run
 ./bin/music-player
+```
+
+### Windows Build Instructions
+
+```powershell
+# Prerequisites: Visual Studio 2017+ with C++ development tools
+
+# Clone and build
+git clone <repository-url>
+cd Qoder_foobar
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Debug
+
+# Run
+.\bin\Debug\music-player.exe
+
+# Test WASAPI audio
+.\bin\Debug\test-wasapi.exe
 ```
 
 ### Build Options
