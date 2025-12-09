@@ -1,0 +1,41 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Compiled files
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Debug files
+*.dSYM/
+*.pdb
+
+# Configuration files (user-specific)
+*.user
+*.suo
+
+# Dependency directories
+external/build/
+
+# Test output
+test_results/
+*.log
+
+# macOS
+.DS_Store
+
+# Generated documentation
+docs/html/
+docs/latex/
