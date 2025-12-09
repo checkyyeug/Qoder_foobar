@@ -1,53 +1,139 @@
 # Quick Start Guide
 
-## Building the Project
+## Quick Build
 
 ```bash
-cd /data/checky/foobar/opencode_foobar
-mkdir -p build && cd build
-/usr/bin/cmake ..
-make -j$(nproc)
+# Clone and build
+git clone <repository-url>
+cd Qoder_foobar
+mkdir build && cd build
+cmake ..
+cmake --build . --config Release
 ```
 
 ## Running the Application
 
+### Basic Commands
+
 ```bash
-# From project root
-./build/bin/music-player
+# Test audio output
+./bin/music-player --test
 
-# Or specify custom plugin directory
-./build/bin/music-player /path/to/plugins
+# List available audio devices
+./bin/music-player --list-devices
+
+# Play audio file (uses plugin system)
+./bin/music-player your-music-file.wav
+
+# Show version information
+./bin/music-player --version
+
+# Display help
+./bin/music-player --help
 ```
 
-## Project Layout
+### Advanced Usage
+
+```bash
+# With custom plugin directory
+./bin/music-player --list-plugins /path/to/plugins
+
+# Specify audio device
+./bin/music-player --device-name " speakers" audio.wav
+```
+
+## Project Architecture
 
 ```
-opencode_foobar/
-├── build/                    # Build output
-│   ├── bin/music-player     # Main executable (57 KB)
+Qoder_foobar/
+├── build/                          # Build output
+│   ├── bin/
+│   │   └── music-player           # Main executable (v0.2.0)
 │   └── lib/
-│       ├── libcore_engine.a           # Core library (82 KB)
-│       ├── libplatform_abstraction.a  # Platform layer (13 KB)
-│       └── wav_decoder.so             # WAV plugin (29 KB)
+│       ├── libcore_engine.a       # Core engine (microkernel)
+│       ├── libplatform_abstraction.a # Platform layer
+│       ├── libfoobar_compat.a     # Compatibility layer
+│       └── plugins/                # Plugin DLLs
+│           ├── wav_decoder.dll
+│           ├── flac_decoder.dll
+│           ├── mp3_decoder.dll
+│           ├── volume_control_dsp.dll
+│           └── equalizer_dsp.dll
 │
-├── core/                     # Core engine (9 files)
-│   ├── core_engine.{h,cpp}
-│   ├── event_bus.{h,cpp}
-│   ├── plugin_host.{h,cpp}
-│   └── service_registry.{h,cpp}
+├── src/                           # Main application
+│   └── main.cpp                   # Proper architecture usage
 │
-├── sdk/headers/              # Public API (5 headers)
-│   ├── mp_types.h
-│   ├── mp_plugin.h
-│   ├── mp_event.h
-│   ├── mp_decoder.h
-│   └── mp_audio_output.h
+├── core/                          # Microkernel components
+│   ├── core_engine.{h,cpp}       # Central orchestrator
+│   ├── service_registry.{h,cpp}   # Dependency injection
+│   ├── event_bus.{h,cpp}         # Async messaging
+│   ├── plugin_host.{h,cpp}        # Plugin lifecycle
+│   ├── playback_engine.{h,cpp}    # Audio pipeline
+│   ├── config_manager.{h,cpp}     # Configuration system
+│   ├── playlist_manager.{h,cpp}   # Playlist management
+│   └── visualization_engine.{h,cpp} # Audio visualization
 │
-├── platform/linux/           # Linux platform implementation
-│   └── audio_output_alsa.cpp
+├── sdk/headers/                   # Public API
+│   ├── mp_types.h                 # Core data types
+│   ├── mp_plugin.h               # Plugin interface
+│   ├── mp_decoder.h              # Decoder interface
+│   ├── mp_audio_output.h         # Audio output
+│   └── mp_event.h                # Event system
 │
-├── plugins/decoders/         # Decoder plugins
-│   └── wav_decoder.cpp
+├── platform/                      # Platform abstraction
+│   ├── audio_output_factory.cpp   # Factory pattern
+│   ├── windows/
+│   │   └── audio_output_wasapi.cpp # Windows WASAPI
+│   └── linux/
+│       └── audio_output_alsa.cpp    # Linux ALSA
+│
+├── plugins/                       # Plugin ecosystem
+│   ├── decoders/                  # Audio format decoders
+│   │   ├── wav_decoder.cpp         # WAV format
+│   │   ├── flac_decoder.cpp        # FLAC format
+│   │   └── mp3_decoder.cpp         # MP3 format
+│   └── dsp/                       # Audio processing
+│       ├── volume_control_dsp.cpp   # Volume control
+│       └── equalizer_dsp.cpp       # Equalizer
+│
+├── compat/                        # foobar2000 compatibility
+│   ├── foobar_compat_manager.cpp  # Compatibility manager
+│   ├── adapters/                  # API adapters
+│   ├── sdk_implementations/       # foobar SDK implementation
+│   └── migration/                 # Data migration tools
+│
+└── docs/                          # Documentation
+    ├── AUDIO_PIPELINE.md          # Audio subsystem design
+    └── PLUGIN_DEVELOPMENT_GUIDE.md # Plugin development
+```
+
+## Testing the Architecture
+
+```bash
+# Verify core engine initialization
+./bin/music-player --test
+# Should show:
+# ✓ Core engine initialized successfully
+# ✓ Plugin system ready
+# ✓ Service registry active
+# ✓ Event bus running
+```
+
+## Plugin Development
+
+**Create a new decoder**:
+
+```bash
+# 1. Create plugin directory
+mkdir plugins/my_decoder
+
+# 2. Implement IDecoder interface
+# See docs/PLUGIN_DEVELOPMENT_GUIDE.md
+
+# 3. Build and test
+cmake --build .
+./bin/music-player --list-plugins
+```
 │
 └── src/
     └── main.cpp              # Application entry point

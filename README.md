@@ -1,102 +1,209 @@
 # Professional Music Player
 
-A cross-platform, professional music player with extensible plugin architecture, inspired by foobar2000.
+A cross-platform, professional music player with microkernel architecture and extensible plugin ecosystem, inspired by foobar2000's design philosophy.
 
-## Features
+## Architecture
 
-- **Microkernel Architecture**: Minimal core with extensive plugin ecosystem
-- **Cross-Platform**: Windows (WASAPI), macOS, and Linux (ALSA) support
-- **Foobar2000 Compatibility**: Load and use existing foobar2000 plugins
-- **GPU Acceleration**: Modern GPU-accelerated UI and visualizations using Skia/Vulkan
-- **Professional Audio**: High-quality audio processing with low latency
-- **Extensible**: Plugin-based architecture for decoders, DSP, UI components
-- **Configuration Management**: JSON-based configuration with auto-save and schema versioning
-- **Gapless Playback**: Designed for seamless track transitions (implementation in progress)
-- **Windows Audio**: Native WASAPI support with automatic format negotiation
+**Microkernel Design**: Minimal core providing essential services with maximum extensibility through plugins:
+- **Service Registry**: Central service discovery and dependency injection
+- **Event Bus**: Asynchronous pub/sub communication between components
+- **Plugin Host**: Hot-loading and lifecycle management
+- **Audio Pipeline**: Abstracted audio processing chain
+- **Platform Abstraction**: Cross-platform audio output
+
+## Current Status: v0.2.0 (Architecture-First)
+
+### ✅ **Implemented Core Components**
+- **Core Engine**: Complete microkernel architecture
+- **Service Registry**: Dependency injection and service discovery
+- **Event Bus**: High-performance async messaging
+- **Plugin System**: Dynamic loading with ABI stability
+- **Configuration Manager**: JSON-based with auto-save and schema versioning
+- **Playback Engine**: Gapless-capable audio pipeline
+- **Playlist Management**: Multiple playlist support with metadata
+- **Visualization Engine**: Real-time audio visualization
+- **Platform Abstraction**: Windows WASAPI + Linux ALSA
+
+### 🔧 **Plugin Ecosystem**
+- **Audio Decoders**: WAV, FLAC, MP3 (modular)
+- **DSP Processors**: Volume control, equalizer (extensible)
+- **Audio Output**: Platform-optimized backends
+
+### 🎯 **foobar2000 Compatibility**
+- **Adapter Layer**: Translates foobar2000 plugin APIs to native interfaces
+- **Data Migration**: Import playlists, configuration, and metadata
+- **SDK Implementation**: Complete foobar2000 API compatibility layer
+
+### ⏳ **In Development**
+- **GPU-Accelerated UI**: Modern rendering using Skia/Vulkan
+- **Advanced Features**: Scripting, advanced visualizations
+- **Extended Compatibility**: More foobar2000 plugin types
 
 ## Building
 
 ### Prerequisites
 
-- CMake 3.20 or higher
-- C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
-- Platform-specific dependencies:
-  - **Linux**: ALSA/PulseAudio development libraries, X11/Wayland libraries
+- **CMake 3.20+** - Build system
+- **C++17 Compatible Compiler** - Modern C++ features
+- **Platform Libraries**:
+  - **Linux**: ALSA development libraries
+  - **Windows**: Visual Studio 2017+ (automatically handled)
   - **macOS**: Xcode command line tools
-  - **Windows**: Visual Studio 2017 or higher
 
-### Linux Build Instructions
+### Quick Build
 
 ```bash
-# Install dependencies (Ubuntu/Debian)
-sudo apt-get install build-essential cmake libasound2-dev libpulse-dev \
-    libx11-dev libxrandr-dev libxi-dev libxcursor-dev libxinerama-dev \
-    libjsoncpp-dev
-
-# Clone and build
-git clone <repository-url>
-cd opencode_foobar
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-
-# Run
-./bin/music-player
-```
-
-### Windows Build Instructions
-
-```powershell
-# Prerequisites: Visual Studio 2017+ with C++ development tools
-
-# Clone and build
+# Clone repository
 git clone <repository-url>
 cd Qoder_foobar
-mkdir build
-cd build
+
+# Configure build
+mkdir build && cd build
 cmake ..
-cmake --build . --config Debug
 
-# Run
-.\bin\Debug\music-player.exe
+# Build all components
+cmake --build . --config Release
 
-# Test WASAPI audio
-.\bin\Debug\test-wasapi.exe
+# Run with audio test
+./music-player --test
+
+# Play audio file
+./music-player your-audio-file.wav
 ```
 
 ### Build Options
 
-- `BUILD_TESTS=ON/OFF` - Build unit tests (default: ON)
-- `BUILD_PLUGINS=ON/OFF` - Build bundled plugins (default: ON)
-- `ENABLE_FOOBAR_COMPAT=ON/OFF` - Enable foobar2000 compatibility (default: ON)
-- `ENABLE_GPU=ON/OFF` - Enable GPU acceleration (default: ON)
-
-Example:
-```bash
-cmake -DBUILD_TESTS=OFF -DENABLE_GPU=ON ..
+```cmake
+# Enable/disable components
+cmake -DBUILD_TESTS=ON \          # Build unit tests
+      -DBUILD_PLUGINS=ON \        # Build plugin ecosystem
+      -DENABLE_FOOBAR_COMPAT=ON \  # foobar2000 compatibility
+      -DENABLE_GPU=OFF \           # GPU acceleration (future)
+      -DENABLE_UI=OFF \            # UI components (future)
+      ..
 ```
 
-## Architecture
+### Windows Specific
 
-The application follows a microkernel architecture:
+```powershell
+# Visual Studio 2017+ required
+cmake -G "Visual Studio 17 2022" ..
+cmake --build . --config Release
 
-- **Core Engine**: Minimal core providing essential services
-- **Plugin Host**: Dynamic plugin loading and management
-- **Platform Abstraction**: Cross-platform compatibility layer
-- **Event Bus**: Inter-component communication
-- **Audio Pipeline**: Format-agnostic audio processing (see [Audio Pipeline Spec](docs/AUDIO_PIPELINE.md))
-- **Configuration Manager**: JSON-based persistent configuration with auto-save
+# Run
+.\bin\Release\music-player.exe --test
+.\bin\Release\music-player.exe audio.wav
+```
 
-See [Design Document](.qoder/quests/music-player-development.md) for detailed architecture information.
+## Usage
 
-## Plugin Development
+### Command Line Interface
 
-See the [Plugin Development Guide](docs/PLUGIN_DEVELOPMENT_GUIDE.md) for comprehensive plugin development tutorials and examples.
+```bash
+# Test audio output
+music-player --test
 
-**Quick Start**:
-1. Review the [Audio Pipeline Specification](docs/AUDIO_PIPELINE.md)
-2. Follow the step-by-step guide to create your first plugin
-3. Check example plugins in `plugins/` directory
+# List available plugins
+music-player --list-plugins
+
+# List audio devices
+music-player --list-devices
+
+# Play audio file using plugin system
+music-player /path/to/audio.wav
+
+# Show help
+music-player --help
+```
+
+### Plugin System
+
+The player uses a **pure plugin architecture**:
+
+```bash
+# Audio is processed through:
+File → Decoder Plugin → DSP Plugins → Audio Output Plugin → Speakers
+```
+
+**Supported Formats** (via plugins):
+- ✅ WAV (native)
+- ✅ FLAC (libFLAC)
+- ✅ MP3 (libmp3lame)
+- ✅ Any format via custom plugins
+
+## Development
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────┐
+│              Core Engine                │
+│  ┌─────────────────────────────────────┐ │
+│  │        Service Registry             │ │
+│  │          Event Bus                  │ │
+│  │        Plugin Host                  │ │
+│  │      Configuration Manager           │ │
+│  └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
+                   │
+        ┌──────────┴──────────┐
+        │    Plugin System     │
+        └──────────┬──────────┘
+    ┌─────────────┼─────────────┐
+    │             │             │
+┌───▼───┐ ┌─────▼─────┐ ┌───▼───┐
+│Decoder│ │    DSP    │ │Output │
+│Plugins│ │  Plugins  │ │Plugins│
+└───────┘ └───────────┘ └───────┘
+```
+
+### Plugin Development
+
+**Creating a Decoder Plugin**:
+
+```cpp
+// Simple decoder implementation
+class MyDecoder : public mp::IDecoder {
+public:
+    Result initialize() override {
+        // Initialize decoder
+        return mp::Result::Success;
+    }
+
+    Result decode(DecoderHandle handle, void* buffer, size_t size) override {
+        // Decode audio data
+        return mp::Result::Success;
+    }
+
+    // ... other required methods
+};
+```
+
+See [Plugin Development Guide](docs/PLUGIN_DEVELOPMENT_GUIDE.md) for complete examples.
+
+### foobar2000 Compatibility
+
+**Adapter Pattern** enables foobar2000 plugin loading:
+
+```cpp
+// foobar2000 plugins are wrapped by adapters
+FoobarDecoderAdapter {
+    mp::IDecoder* native_decoder;
+    foobar::input_decoder* foobar_decoder;
+
+    // Translate API calls between systems
+    Result decode(void* buffer, size_t size) override {
+        foobar_result = foobar_decoder->decode(foobar_buffer);
+        return translate_foobar_result(foobar_result);
+    }
+};
+```
+
+**Current Compatibility**:
+- ✅ Input decoder plugins (adapters implemented)
+- ✅ Data migration (playlists, configuration)
+- ⏳ DSP plugins (in development)
+- ⏳ UI extensions (planned)
 
 ## Documentation
 

@@ -31,10 +31,50 @@ set_target_properties(plugin_wav_decoder PROPERTIES
 )
 
 # FLAC Decoder Plugin
-# Try to find FLAC library
-find_package(PkgConfig)
-if(PKG_CONFIG_FOUND)
-    pkg_check_modules(FLAC flac)
+# Try to find FLAC library using multiple methods
+set(FLAC_FOUND FALSE)
+
+# Method 1: Try find_package (works on Windows with vcpkg or conan)
+find_package(FLAC QUIET)
+if(FLAC_FOUND)
+    set(FLAC_LIBRARIES FLAC::FLAC)
+    message(STATUS "FLAC library found via find_package")
+else()
+    # Method 2: Try pkg-config (works on Linux)
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(FLAC flac)
+        if(FLAC_FOUND)
+            message(STATUS "FLAC library found via pkg-config")
+        endif()
+    endif()
+endif()
+
+# Method 3: Manual search (fallback)
+if(NOT FLAC_FOUND)
+    find_path(FLAC_INCLUDE_DIR FLAC/stream_decoder.h
+        PATHS
+            "C:/Program Files/FLAC/include"
+            "C:/FLAC/include"
+            "/usr/include"
+            "/usr/local/include"
+    )
+    
+    find_library(FLAC_LIBRARY
+        NAMES FLAC libFLAC FLAC_static
+        PATHS
+            "C:/Program Files/FLAC/lib"
+            "C:/FLAC/lib"
+            "/usr/lib"
+            "/usr/local/lib"
+    )
+    
+    if(FLAC_INCLUDE_DIR AND FLAC_LIBRARY)
+        set(FLAC_FOUND TRUE)
+        set(FLAC_LIBRARIES ${FLAC_LIBRARY})
+        set(FLAC_INCLUDE_DIRS ${FLAC_INCLUDE_DIR})
+        message(STATUS "FLAC library found manually at ${FLAC_LIBRARY}")
+    endif()
 endif()
 
 add_library(plugin_flac_decoder SHARED
@@ -52,9 +92,10 @@ if(FLAC_FOUND)
             sdk_headers
             ${FLAC_LIBRARIES}
     )
-    target_include_directories(plugin_flac_decoder PRIVATE ${FLAC_INCLUDE_DIRS})
-    target_compile_definitions(plugin_flac_decoder PRIVATE)
-    message(STATUS "FLAC library found, building FLAC decoder plugin")
+    if(FLAC_INCLUDE_DIRS)
+        target_include_directories(plugin_flac_decoder PRIVATE ${FLAC_INCLUDE_DIRS})
+    endif()
+    message(STATUS "Building FLAC decoder plugin with libFLAC support")
 else()
     target_link_libraries(plugin_flac_decoder
         PRIVATE
@@ -62,6 +103,10 @@ else()
     )
     target_compile_definitions(plugin_flac_decoder PRIVATE NO_FLAC)
     message(WARNING "FLAC library not found, FLAC decoder will be stub only")
+    message(STATUS "To build with FLAC support:")
+    message(STATUS "  - Windows: Install FLAC via vcpkg (vcpkg install flac)")
+    message(STATUS "  - Linux: Install libflac-dev (apt-get install libflac-dev)")
+    message(STATUS "  - macOS: Install flac via Homebrew (brew install flac)")
 endif()
 
 # Set compile options (platform-specific)

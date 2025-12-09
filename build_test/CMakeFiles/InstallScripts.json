@@ -1,0 +1,16 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/workspaces/foobar/Qoder_foobar/build_test/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/core/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/platform/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/sdk/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/plugins/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/plugins/decoders/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/plugins/dsp/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/gpu/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/compat/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_test/compat/tests/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

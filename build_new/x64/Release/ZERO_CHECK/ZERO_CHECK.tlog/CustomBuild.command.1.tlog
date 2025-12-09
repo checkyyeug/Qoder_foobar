@@ -1,0 +1,10 @@
+^D:\WORKSPACES\FOOBAR\QODER_FOOBAR\BUILD_NEW\CMAKEFILES\1AFA88FB2E1DA467306C5FEBFD0D6308\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/workspaces/foobar/Qoder_foobar -BD:/workspaces/foobar/Qoder_foobar/build_new --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/workspaces/foobar/Qoder_foobar/build_new/MusicPlayer.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

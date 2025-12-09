@@ -1,0 +1,12 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/workspaces/foobar/Qoder_foobar/build_new/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_new/platform/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_new/compat/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_new/plugins/decoders/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_new/plugins/dsp/cmake_install.cmake",
+		"D:/workspaces/foobar/Qoder_foobar/build_new/tests/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
