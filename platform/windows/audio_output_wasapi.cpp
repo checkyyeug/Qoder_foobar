@@ -198,15 +198,20 @@ public:
             return Result::Error;
         }
         
-        // Set up audio format
-        WAVEFORMATEX wave_format = {};
-        wave_format.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
-        wave_format.nChannels = channels_;
-        wave_format.nSamplesPerSec = sample_rate_;
-        wave_format.wBitsPerSample = 32; // Float32
-        wave_format.nBlockAlign = (wave_format.nChannels * wave_format.wBitsPerSample) / 8;
-        wave_format.nAvgBytesPerSec = wave_format.nSamplesPerSec * wave_format.nBlockAlign;
-        wave_format.cbSize = 0;
+        // Set up audio format with EXTENSIBLE support for modern Windows
+        WAVEFORMATEXTENSIBLE wave_format = {};
+        wave_format.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE;
+        wave_format.Format.nChannels = channels_;
+        wave_format.Format.nSamplesPerSec = sample_rate_;
+        wave_format.Format.wBitsPerSample = 32; // Float32
+        wave_format.Format.nBlockAlign = (wave_format.Format.nChannels * wave_format.Format.wBitsPerSample) / 8;
+        wave_format.Format.nAvgBytesPerSec = wave_format.Format.nSamplesPerSec * wave_format.Format.nBlockAlign;
+        wave_format.Format.cbSize = sizeof(wave_format) - sizeof(WAVEFORMATEX);
+        wave_format.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
+        wave_format.Samples.wValidBitsPerSample = 32;
+        wave_format.dwChannelMask = (channels_ == 1) ? KSAUDIO_SPEAKER_MONO
+                                                   : (channels_ == 2) ? (SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT)
+                                                   : KSAUDIO_SPEAKER_STEREO; // Default to stereo
         
         // Calculate buffer duration (in 100-nanosecond units)
         // Use 10ms as default minimum
@@ -218,7 +223,7 @@ public:
             AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
             buffer_duration,
             0,
-            &wave_format,
+            (WAVEFORMATEX*)&wave_format,
             nullptr
         );
         

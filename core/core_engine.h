@@ -6,6 +6,15 @@
 #include "config_manager.h"
 #include "playlist_manager.h"
 #include "visualization_engine.h"
+#include "playback_engine.h"
+
+// Forward declarations for platform-specific types
+namespace mp {
+    class IAudioOutput;
+    namespace platform {
+        IAudioOutput* create_platform_audio_output();
+    }
+}
 #include <memory>
 #include <string>
 
@@ -56,7 +65,18 @@ public:
     VisualizationEngine* get_visualization_engine() {
         return visualization_engine_.get();
     }
-    
+
+    // Get playback engine
+    PlaybackEngine* get_playback_engine() {
+        return playback_engine_.get();
+    }
+
+    // Play a file using the plugin system
+    Result play_file(const std::string& file_path);
+
+    // Stop playback
+    Result stop_playback();
+
     // Check if initialized
     bool is_initialized() const {
         return initialized_;
@@ -69,7 +89,8 @@ private:
     std::unique_ptr<ConfigManager> config_manager_;
     std::unique_ptr<PlaylistManager> playlist_manager_;
     std::unique_ptr<VisualizationEngine> visualization_engine_;
-    
+    std::unique_ptr<PlaybackEngine> playback_engine_;
+
     bool initialized_;
 };
 
