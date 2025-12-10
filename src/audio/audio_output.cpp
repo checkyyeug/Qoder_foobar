@@ -40,6 +40,18 @@ std::unique_ptr<IAudioOutput> create_audio_output() {
 #endif
 }
 
+// Factory function with configuration
+std::unique_ptr<IAudioOutput> create_audio_output(const AudioConfig& config) {
+    // Create the appropriate backend based on compile-time selection
+    // Note: The specific backend should honor the config in its initialize method
+    std::unique_ptr<IAudioOutput> output = create_audio_output();
+
+    // We can't call initialize here without format info
+    // The caller should call initialize with both format and config
+
+    return output;
+}
+
 // Backend name function
 const char* get_audio_backend_name() {
     // Return the name of the selected backend

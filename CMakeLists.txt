@@ -259,6 +259,49 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(test-resampler PRIVATE m)
 endif()
 
+# Plugin-Aware Music Player with foobar2000 compatibility
+add_executable(music-player-plugin
+    src/music_player_plugin.cpp
+    src/audio/plugin_audio_decoder.cpp
+    src/audio/enhanced_sample_rate_converter.cpp
+    src/audio/adaptive_resampler.cpp
+    src/audio/sample_rate_converter.cpp
+    src/audio/cubic_resampler.cpp
+    src/audio/sinc_resampler.cpp
+    src/audio/wav_writer.cpp
+    compat/plugin_loader/plugin_loader.cpp
+    compat/sdk_implementations/service_base_impl.cpp
+    compat/sdk_implementations/input_decoder_impl.cpp
+    compat/foobar_sdk/foobar2000.cpp
+    compat/foobar_compat_manager.cpp
+)
+
+target_include_directories(music-player-plugin PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/compat
+    ${CMAKE_CURRENT_SOURCE_DIR}/compat/plugin_loader
+    ${CMAKE_CURRENT_SOURCE_DIR}/compat/sdk_implementations
+    ${CMAKE_CURRENT_SOURCE_DIR}/compat/foobar_sdk
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdk/headers
+)
+
+target_link_libraries(music-player-plugin PRIVATE
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+# Link math library on Linux
+if(UNIX AND NOT APPLE)
+    target_link_libraries(music-player-plugin PRIVATE m)
+endif()
+
+# Link dl for dynamic loading on Linux
+if(UNIX)
+    target_link_libraries(music-player-plugin PRIVATE ${CMAKE_DL_LIBS})
+endif()
+
 # ============================================================================
 # Summary
 # ============================================================================
@@ -290,5 +333,7 @@ message(STATUS "Plugins:")
 message(STATUS "  ✓ WAV decoder")
 message(STATUS "  ✓ MP3 decoder (minimp3)")
 message(STATUS "  ✓ FLAC decoder (stub)")
+message(STATUS "  ✓ foobar2000 plugin support")
+message(STATUS "  ✓ Dynamic plugin loading")
 message(STATUS "")
 message(STATUS "✅ Configuration complete!")

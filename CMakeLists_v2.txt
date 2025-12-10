@@ -1,0 +1,552 @@
+# ============================================================================
+# Qoder foobar v2.0 - Plugin Architecture CMakeLists.txt
+# ============================================================================
+
+cmake_minimum_required(VERSION 3.20)
+project(QoderFoobar VERSION 2.0.0 LANGUAGES CXX)
+
+# 设置C++标准
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# 构建配置
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# 查找JSON库
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+    # 如果系统没有安装，使用内置版本
+    message(STATUS "Using bundled nlohmann/json")
+    set(JSON_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/nlohmann)
+    if(NOT EXISTS ${JSON_INCLUDE_DIR}/json.hpp)
+        message(WARNING "nlohmann/json not found, please install it or place in third_party/nlohmann/")
+    endif()
+else()
+    message(STATUS "Found nlohmann/json: ${nlohmann_json_VERSION}")
+    set(JSON_INCLUDE_DIR ${nlohmann_json_INCLUDE_DIRS})
+endif()
+
+# 构建类型
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
+# 输出目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_PLUGIN_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)
+
+# 查找必需的包
+find_package(Threads REQUIRED)
+
+# 平台检测和配置
+if(WIN32)
+    set(MP_PLATFORM_WINDOWS TRUE)
+    add_definitions(-DMP_PLATFORM_WINDOWS=1)
+    message(STATUS "Platform: Windows")
+    set(PLATFORM_LIBS ole32 uuid)
+elseif(APPLE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set(MP_PLATFORM_MACOS TRUE)
+        add_definitions(-DMP_PLATFORM_MACOS=1)
+        message(STATUS "Platform: macOS")
+        # 查找CoreAudio
+        find_library(COREAUDIO_FRAMEWORK CoreAudio)
+        if(COREAUDIO_FRAMEWORK)
+            list(APPEND PLATFORM_LIBS ${COREAUDIO_FRAMEWORK})
+        endif()
+    endif()
+elseif(UNIX)
+    set(MP_PLATFORM_LINUX TRUE)
+    add_definitions(-DMP_PLATFORM_LINUX=1)
+    message(STATUS "Platform: Linux")
+
+    # 查找ALSA
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(ALSA QUIET alsa)
+        if(ALSA_FOUND)
+            message(STATUS "ALSA found: ${ALSA_VERSION}")
+            list(APPEND PLATFORM_LIBS ${ALSA_LIBRARIES})
+            include_directories(${ALSA_INCLUDE_DIRS})
+        endif()
+
+        # 查找PulseAudio
+        pkg_check_modules(PULSEAUDIO QUIET libpulse)
+        if(PULSEAUDIO_FOUND)
+            message(STATUS "PulseAudio found")
+            list(APPEND PLATFORM_LIBS ${PULSEAUDIO_LIBRARIES})
+            include_directories(${PULSEAUDIO_INCLUDE_DIRS})
+        endif()
+    endif()
+endif()
+
+# ============================================================================
+# Qoder foobar SDK
+# ============================================================================
+
+# SDK库（静态库，供插件使用）
+add_library(qoder_sdk STATIC
+    sdk/qoder_plugin_sdk.cpp
+)
+
+target_include_directories(qoder_sdk PUBLIC
+    ${CMAKE_SOURCE_DIR}/sdk
+)
+
+# 配置管理器库
+add_library(qoder_config STATIC
+    config/config_manager.cpp
+)
+
+target_include_directories(qoder_config PUBLIC
+    ${CMAKE_SOURCE_DIR}/config
+    ${JSON_INCLUDE_DIR}
+)
+
+if(nlohmann_json_FOUND)
+    target_link_libraries(qoder_config PUBLIC nlohmann_json::nlohmann_json)
+endif()
+
+# 核心系统库
+add_library(qoder_core STATIC
+    core/plugin_registry.cpp
+    core/plugin_manager.cpp
+)
+
+target_include_directories(qoder_core PUBLIC
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/sdk
+    ${CMAKE_SOURCE_DIR}/config
+    ${JSON_INCLUDE_DIR}
+)
+
+target_link_libraries(qoder_core PUBLIC
+    qoder_sdk
+    qoder_config
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+if(UNIX)
+    target_link_libraries(qoder_core PRIVATE ${CMAKE_DL_LIBS})
+endif()
+
+# ============================================================================
+# 兼容层（foobar2000支持）
+# ============================================================================
+
+# foobar2000 SDK兼容库
+add_library(foobar_sdk STATIC
+    compat/foobar_sdk/foobar2000.cpp
+)
+
+target_include_directories(foobar_sdk PUBLIC
+    ${CMAKE_SOURCE_DIR}/compat/foobar_sdk
+)
+
+# foobar2000适配器
+add_library(foobar_adapter STATIC
+    compat/foobar2000/foobar_adapter.cpp
+)
+
+target_include_directories(foobar_adapter PUBLIC
+    ${CMAKE_SOURCE_DIR}/compat/foobar2000
+)
+
+target_link_libraries(foobar_adapter PUBLIC
+    foobar_sdk
+    qoder_core
+)
+
+# SDK实现
+add_library(sdk_impl STATIC
+    compat/sdk_implementations/service_base_impl.cpp
+    compat/sdk_implementations/input_decoder_impl.cpp
+)
+
+target_include_directories(sdk_impl PUBLIC
+    ${CMAKE_SOURCE_DIR}/compat/sdk_implementations
+)
+
+target_link_libraries(sdk_impl PUBLIC
+    foobar_sdk
+    qoder_sdk
+)
+
+# 插件加载器
+add_library(plugin_loader STATIC
+    compat/plugin_loader/plugin_loader.cpp
+)
+
+target_include_directories(plugin_loader PUBLIC
+    ${CMAKE_SOURCE_DIR}/compat/plugin_loader
+)
+
+target_link_libraries(plugin_loader PUBLIC
+    foobar_adapter
+    qoder_core
+    ${PLATFORM_LIBS}
+)
+
+if(UNIX)
+    target_link_libraries(plugin_loader PRIVATE ${CMAKE_DL_LIBS})
+endif()
+
+# ============================================================================
+# 音频处理库
+# ============================================================================
+
+# 音频处理库
+add_library(audio_processing STATIC
+    src/audio/sample_rate_converter.cpp
+    src/audio/cubic_resampler.cpp
+    src/audio/sinc_resampler.cpp
+    src/audio/enhanced_sample_rate_converter.cpp
+    src/audio/adaptive_resampler.cpp
+    src/audio/sample_rate_converter_64.cpp
+    src/audio/wav_writer.cpp
+)
+
+target_include_directories(audio_processing PUBLIC
+    ${CMAKE_SOURCE_DIR}/src/audio
+)
+
+target_link_libraries(audio_processing PUBLIC
+    ${PLATFORM_LIBS}
+)
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(audio_processing PRIVATE m)
+endif()
+
+# ============================================================================
+# 主应用程序
+# ============================================================================
+
+# 新架构的音乐播放器
+add_executable(qoder-player
+    src/qoder_player.cpp
+)
+
+target_include_directories(qoder-player PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/sdk
+)
+
+target_link_libraries(qoder-player PRIVATE
+    qoder_core
+    qoder_config
+    qoder_sdk
+    audio_processing
+    foobar_adapter
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+# 带配置系统的音乐播放器
+add_executable(music-player-config
+    src/music_player_config.cpp
+    src/audio/audio_output.cpp
+    src/audio/audio_output_alsa.cpp
+    src/audio/audio_output_pulse.cpp
+    src/audio/audio_output_wasapi.cpp
+    src/audio/audio_output_coreaudio.cpp
+    src/audio/audio_output_stub.cpp
+)
+
+target_include_directories(music-player-config PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/audio
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/sdk
+    ${CMAKE_SOURCE_DIR}/config
+    ${JSON_INCLUDE_DIR}
+)
+
+target_link_libraries(music-player-config PRIVATE
+    qoder_config
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+if(nlohmann_json_FOUND)
+    target_link_libraries(music-player-config PRIVATE nlohmann_json::nlohmann_json)
+endif()
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(music-player-config PRIVATE m)
+endif()
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(qoder-player PRIVATE m)
+endif()
+
+# 兼容层的音乐播放器（临时保留）
+add_executable(music-player-plugin
+    src/music_player_plugin.cpp
+    src/audio/plugin_audio_decoder.cpp
+    compat/sdk_implementations/service_base_impl.cpp
+    compat/sdk_implementations/input_decoder_impl.cpp
+    compat/foobar_sdk/foobar2000.cpp
+    compat/foobar_compat_manager.cpp
+)
+
+target_include_directories(music-player-plugin PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/audio
+    ${CMAKE_SOURCE_DIR}/compat
+    ${CMAKE_SOURCE_DIR}/compat/plugin_loader
+    ${CMAKE_SOURCE_DIR}/compat/sdk_implementations
+    ${CMAKE_SOURCE_DIR}/compat/foobar_sdk
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/sdk
+)
+
+target_link_libraries(music-player-plugin PRIVATE
+    audio_processing
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(music-player-plugin PRIVATE m)
+    target_link_libraries(music-player-plugin PRIVATE ${CMAKE_DL_LIBS})
+endif()
+
+# ============================================================================
+# 原有播放器（保持兼容）
+# ============================================================================
+
+add_executable(music-player
+    src/music_player_simple.cpp
+)
+
+target_include_directories(music-player PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/platform
+    ${CMAKE_SOURCE_DIR}/compat
+)
+
+target_link_libraries(music-player PRIVATE
+    qoder_core
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+# ============================================================================
+# 测试程序
+# ============================================================================
+
+# 音频测试
+add_executable(test-audio
+    tests/test_audio.cpp
+)
+
+target_include_directories(test-audio PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk
+    ${CMAKE_SOURCE_DIR}/core
+)
+
+target_link_libraries(test-audio PRIVATE
+    qoder_core
+    audio_processing
+    Threads::Threads
+)
+
+# 插件系统测试
+add_executable(test-plugin
+    tests/test_plugin_system.cpp
+)
+
+target_include_directories(test-plugin PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/compat
+)
+
+target_link_libraries(test-plugin PRIVATE
+    qoder_core
+    qoder_sdk
+    foobar_adapter
+    Threads::Threads
+)
+
+# 配置系统测试
+add_executable(test-config
+    examples/test_config_system.cpp
+    src/audio/configured_resampler.cpp
+)
+
+target_include_directories(test-config PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/audio
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/config
+    ${JSON_INCLUDE_DIR}
+)
+
+target_link_libraries(test-config PRIVATE
+    qoder_core
+    qoder_config
+    qoder_sdk
+    audio_processing
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+if(nlohmann_json_FOUND)
+    target_link_libraries(test-config PRIVATE nlohmann_json::nlohmann_json)
+endif()
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test-config PRIVATE m)
+endif()
+
+# 重采样精度测试
+add_executable(test-resampler-precision
+    examples/test_resampler_precision.cpp
+    src/audio/configured_resampler.cpp
+)
+
+target_include_directories(test-resampler-precision PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/audio
+    ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/config
+    ${JSON_INCLUDE_DIR}
+)
+
+target_link_libraries(test-resampler-precision PRIVATE
+    qoder_core
+    qoder_config
+    qoder_sdk
+    audio_processing
+    ${PLATFORM_LIBS}
+    Threads::Threads
+)
+
+if(nlohmann_json_FOUND)
+    target_link_libraries(test-resampler-precision PRIVATE nlohmann_json::nlohmann_json)
+endif()
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test-resampler-precision PRIVATE m)
+endif()
+
+# ============================================================================
+# 插件构建
+# ============================================================================
+
+# 选项：是否构建插件
+option(BUILD_PLUGINS "Build plugins" ON)
+
+if(BUILD_PLUGINS)
+    # WAV解码器插件
+    add_subdirectory(plugins/wav_decoder)
+
+    # DSP码率转换器插件
+    add_subdirectory(plugins/dsp_resampler)
+
+    # 可以添加更多插件
+    # add_subdirectory(plugins/mp3_decoder)
+    # add_subdirectory(plugins/flac_decoder)
+endif()
+
+# ============================================================================
+# 安装
+# ============================================================================
+
+# 安装可执行文件
+install(TARGETS
+    qoder-player
+    music-player-plugin
+    music-player
+    music-player-config
+    test-audio
+    test-plugin
+    RUNTIME DESTINATION bin
+)
+
+# 安装配置文件
+install(FILES
+    config/default_config.json
+    DESTINATION share/qoder-foobar/config
+    RENAME config.json
+)
+
+# 安装主题文件
+install(DIRECTORY
+    config/themes
+    DESTINATION share/qoder-foobar
+)
+
+# 安装插件目录
+install(DIRECTORY
+    plugins
+    DESTINATION lib/qoder-foobar
+)
+
+# 安装SDK头文件
+install(DIRECTORY
+    sdk
+    DESTINATION include/qoder-foobar
+)
+
+# 创建默认配置目录
+install(CODE "
+    file(MAKE_DIRECTORY \$ENV{HOME}/.qoder-foobar)
+    file(COPY ${CMAKE_SOURCE_DIR}/config/default_config.json DESTINATION \$ENV{HOME}/.qoder-foobar)
+    file(RENAME \$ENV{HOME}/.qoder-foobar/default_config.json \$ENV{HOME}/.qoder-foobar/config.json)
+")
+
+# ============================================================================
+# 总结
+# ============================================================================
+
+message(STATUS "")
+message(STATUS "=== Qoder foobar v2.0 - Plugin Architecture ===")
+message(STATUS "")
+message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "Architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "")
+
+message(STATUS "Core Components:")
+message(STATUS "  ✓ Qoder SDK")
+message(STATUS "  ✓ Plugin Manager")
+message(STATUS "  ✓ Audio Processing")
+message(STATUS "  ✓ Configuration System")
+message(STATUS "")
+
+message(STATUS "Audio Backend:")
+if(WIN32)
+    message(STATUS "  ✓ WASAPI (Windows)")
+elseif(APPLE)
+    message(STATUS "  ✓ CoreAudio (macOS)")
+else()
+    if(ALSA_FOUND)
+        message(STATUS "  ✓ ALSA (Linux)")
+    else()
+        message(STATUS "  ⚠ Stub (Linux - no ALSA)")
+    endif()
+endif()
+
+message(STATUS "")
+message(STATUS "Plugin System:")
+message(STATUS "  ✓ Native Plugin API")
+message(STATUS "  ✓ foobar2000 Compatibility")
+message(STATUS "  ✓ Hot-swapping Support")
+message(STATUS "  ✓ Dynamic Loading")
+message(STATUS "")
+
+message(STATUS "✅ Configuration complete!")
+message(STATUS "")
