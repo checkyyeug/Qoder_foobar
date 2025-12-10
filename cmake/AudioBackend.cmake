@@ -28,10 +28,10 @@ endmacro()
 # Windows: 1. WASAPI (always available), 2. WinMM
 #----------------------------------------------------------
 if(WIN32)
-    # Check for WASAPI source file
+    # WASAPI is always available on Windows Vista and later
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/audio/audio_output_wasapi.cpp")
         add_audio_backend("WASAPI" "audio_output_wasapi.cpp" "" "")
-        list(APPEND AUDIO_LIBS "winmm" "ole32")
+        list(APPEND AUDIO_LIBS "ole32")
     else()
         message(STATUS "  → WASAPI source not found, using stub")
     endif()
@@ -41,13 +41,14 @@ if(WIN32)
 #----------------------------------------------------------
 elseif(APPLE)
     # Find CoreAudio framework
-    find_library(COREAUDIO_LIB CoreAudio)
-    find_library(AUDIOTOOLBOX_LIB AudioToolbox)
+    find_library(COREAUDIO_LIB CoreAudio REQUIRED)
+    find_library(AUDIOTOOLBOX_LIB AudioToolbox REQUIRED)
+    find_library(COREFOUNDATION_LIB CoreFoundation REQUIRED)
 
-    if(COREAUDIO_LIB AND AUDIOTOOLBOX_LIB AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/audio/audio_output_coreaudio.cpp")
-        add_audio_backend("CoreAudio" "audio_output_coreaudio.cpp" "COREAUDIO_LIB;AUDIOTOOLBOX_LIB" "")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/audio/audio_output_coreaudio.cpp")
+        add_audio_backend("CoreAudio" "audio_output_coreaudio.cpp" "COREAUDIO_LIB;AUDIOTOOLBOX_LIB;COREFOUNDATION_LIB" "")
     else()
-        message(STATUS "  → CoreAudio not found, using stub")
+        message(STATUS "  → CoreAudio source not found, using stub")
     endif()
 
 #----------------------------------------------------------
