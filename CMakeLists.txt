@@ -416,6 +416,7 @@ add_executable(music-player-plugin
     # compat/sdk_implementations/input_decoder_impl.cpp
     compat/foobar_sdk/foobar2000.cpp
     compat/foobar_compat_manager.cpp
+    compat/data_migration_manager.cpp
 )
 
 target_include_directories(music-player-plugin PRIVATE

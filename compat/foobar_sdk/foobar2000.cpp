@@ -36,14 +36,13 @@ bool register_service(const GUID& guid, std::unique_ptr<service_base> service) {
     return true;
 }
 
-// Service query implementation
-FOOBAR2000_EXPORT bool service_query(const GUID& guid, void** out) {
+// Service query implementation with C interface
+extern "C" FOOBAR2000_EXPORT bool service_query(const foobar2000::GUID& guid, void** out) {
     auto it = g_services.find(guid);
     if (it != g_services.end()) {
         *out = static_cast<void*>(it->second.get());
         return true;
     }
-    *out = nullptr;
     return false;
 }
 

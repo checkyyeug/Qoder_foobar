@@ -1,10 +1,16 @@
 #include "foobar_compat_manager.h"
-#include "adapters/adapter_base.h"
-#include "migration/data_migration_manager.h"
-#include "logging.h"
+#include "adapter_base.h"
+#include "data_migration_manager.h"
 #include <cstdarg>
 #include <cstdio>
 #include <algorithm>
+#include <iostream>
+
+// Logging macros
+#define COMPAT_LOG_ERROR(msg) std::cerr << msg << std::endl
+#define COMPAT_LOG_WARN(msg)  std::cout << "[WARNING] " << msg << std::endl
+#define COMPAT_LOG_DEBUG(msg) std::cout << "[DEBUG] " << msg << std::endl
+#define COMPAT_LOG_INFO(msg)  std::cout << "[INFO] " << msg << std::endl
 
 #ifdef _WIN32
 #include <windows.h>

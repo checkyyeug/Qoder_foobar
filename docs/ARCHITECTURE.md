@@ -1,346 +1,297 @@
-# Qoder foobar v2.0 系统架构
+# Qoder Foobar - 架构设计文档
 
-## 项目概述
+## 概述
 
-Qoder foobar v2.0 是一个模块化、跨平台的专业音乐播放器，支持：
-- 32/64位浮点音频处理
-- 自适应采样率转换（8kHz - 768kHz）
-- 插件热插拔系统
-- JSON配置管理
-- 多平台音频后端（ALSA/Pulse/WASAPI/CoreAudio）
+Qoder Foobar 是一个基于 C++ 的模块化跨平台音乐播放器，采用插件架构设计，支持 foobar2000 插件兼容性。本文档详细描述了系统的整体架构、核心组件和设计原则。
 
-## 整体架构
+## 核心架构
+
+### 分层架构设计
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Qoder foobar v2.0                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                           应用层 (Application Layer)                          │
-│  ┌─────────────────────┬─────────────────────┬─────────────────────────────┐    │
-│  │  命令行工具           │   图形用户界面      │      测试工具              │    │
-│  │  CLI Interface      │   GUI Application     │      Test Suites           │    │
-│  └─────────────────────┴─────────────────────┴─────────────────────────────┘    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                           服务层 (Service Layer)                             │
-│  ┌─────────────┬──────────┬─────────────┬──────────┬─────────────┬─────────────┐  │
-│  │   播放器    │ 播放列表  │  元数据管理  │  可视化   │  配置管理  │  日志系统  │  │
-│  │  Engine   │  Manager │  Manager   │  Engine   │  Manager    │  System    │  │
-│  └─────────────┴──────────┴─────────────┴──────────┴─────────────┴─────────────┘  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                           插件层 (Plugin Layer)                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                      Plugin Manager                           │   │
-│  │  ┌─────────────────┬──────────────┬─────────────────────┐       │   │
-│  │  │   Native Plugin   │ Compatibility │   Foobar2000      │       │   │
-│  │  │      SDK         │     Layer    │   Adapter         │       │   │
-│  │  └─────────────────┴──────────────┴─────────────────────┘       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                           音频处理层 (Audio Layer)                           │
-│  ┌─────────────┬─────────────────────┬─────────────┬─────────────────────┐  │
-│  │   解码器    │    DSP处理     │  重采样器   │    输出系统     │  │
-│  │  Plugins    │   Plugins     │  System     │    Plugins     │  │
-│  └─────────────┴─────────────────────┴─────────────┴─────────────────────┘  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                           平台抽象层 (Platform Layer)                        │
-│  ┌─────────────────────┬──────────────┬─────────────────────────────┐   │
-│  │      Windows      │     macOS     │         Linux            │   │
-│  │    (WASAPI)       │  (CoreAudio) │ (ALSA/PulseAudio)        │   │
-│  └─────────────────────┴──────────────┴─────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                 应用层 (Applications)                 │
+├─────────────────────────────────────────────────────┤
+│  music-player-simple  │  music-player-plugin         │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                兼容性层 (Compatibility)               │
+├─────────────────────────────────────────────────────┤
+│  Foobar2000 SDK    │  Plugin Loader  │  Adapters    │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                 核心引擎层 (Core)                    │
+├─────────────────────────────────────────────────────┤
+│  Playback Engine  │  Event Bus     │  Plugin Host   │
+│  Config Manager   │  Playlist Mgr  │  Decoder Reg.  │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│               插件系统层 (Plugins)                   │
+├─────────────────────────────────────────────────────┤
+│  MP3 Decoder      │  FLAC Decoder   │  OGG Decoder  │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│              平台抽象层 (Platform)                   │
+├─────────────────────────────────────────────────────┤
+│  Audio Output     │  File System   │  Threading     │
+└─────────────────────────────────────────────────────┘
 ```
 
-## 核心组件
+## 核心组件详解
 
-### 1. 配置系统 (config/)
-```cpp
-// 主要接口
-class ConfigManager {
-    bool initialize(const std::string& config_file = "");
-    const AppConfig& get_config() const;
-    template<typename T> void set_config_value(const std::string& path, const T& value);
-    void add_change_callback(std::function<void(const AppConfig&)> callback);
-};
-```
-- **配置文件层次**：命令行 > ~/.qoder-foobar/ > /etc/ > 安装目录 > 源码目录
-- **环境变量覆盖**：QODER_AUDIO_*, QODER_RESAMPLER_*, QODER_LOGGING_*
-- **实时更新**：配置变更自动通知到各模块
-- **验证机制**：自动验证配置值的有效范围
+### 1. 核心引擎 (Core Engine)
 
-### 2. 插件系统 (sdk/, compat/, plugins/)
-```cpp
-// 核心插件接口
-class IPlugin {
-    virtual bool initialize() = 0;
-    virtual PluginInfo get_info() const = 0;
-    virtual PluginState get_state() const = 0;
-};
+#### 1.1 CoreEngine
+主引擎类，负责整个播放器的生命周期管理。
 
-class IAudioDecoder : public IPlugin {
-    virtual bool can_decode(const std::string& file_path) = 0;
-    virtual int decode(AudioBuffer& buffer, int max_frames) = 0;
-    virtual AudioFormat get_format() const = 0;
-};
-```
-- **双SDK架构**：Native SDK + foobar2000兼容层
-- **插件类型**：解码器、DSP处理器、音频输出、可视化
-- **热插拔**：运行时动态加载/卸载
-- **依赖管理**：自动解析插件依赖关系
-- **沙箱隔离**：插件异常不影响主程序
+**职责：**
+- 初始化各个子系统
+- 管理播放状态
+- 协调组件间交互
 
-### 3. 音频处理管道 (src/audio/)
-```
-音频文件 → 解码器插件 → PCM数据 → DSP插件 → 重采样器 → 音频输出插件 → 硬件
-```
-
-#### 3.1 重采样系统
-```cpp
-// 精度选择
-class ConfiguredSampleRateConverter {
-    bool configure(int input_rate, int output_rate, int channels);
-    void set_precision(int bits); // 32或64位
-};
-
-// 算法实现
-- LinearSampleRateConverter     // 线性插值（最快）
-- CubicSampleRateConverter      // 三次插值（平衡）
-- SincSampleRateConverter       // Sinc插值（高质量）
-- AdaptiveSampleRateConverter  // 自适应选择
-```
-
-#### 3.2 64位浮点支持
-```cpp
-class ISampleRateConverter64 {
-    virtual bool configure(int input_rate, int output_rate, int channels) = 0;
-    virtual int process(const double* input, double* output, int input_frames) = 0;
-};
-```
-- **动态范围**：32位(~150dB) vs 64位(~320dB)
-- **性能开销**：64位CPU使用率增加30-40%
-- **适用场景**：专业音频制作使用64位，一般播放32位足够
-
-### 4. 跨平台音频抽象 (src/audio/, platform/)
-```cpp
-class AudioOutputBase : public IAudioOutput {
-    bool set_volume(double volume) override;
-    bool set_mute(bool mute) override;
-protected:
-    virtual bool do_initialize() = 0;
-    virtual int do_write(const float* data, int frames) = 0;
-};
-```
-
-#### 平台实现
-- **Linux**:
-  - ALSA直接输出（低延迟）
-  - PulseAudio输出（混音支持）
-  - 自动检测，优先PulseAudio
-- **Windows**: WASAPI（独占/共享模式）
-- **macOS**: CoreAudio（低延迟音频单元）
-
-### 5. 核心引擎 (core/)
+**关键接口：**
 ```cpp
 class CoreEngine {
-    bool load_file(const std::string& path);
-    bool play();
-    bool pause();
-    bool stop();
-
-    // 插件管理
-    PluginManager& plugin_manager();
-
-    // 配置访问
-    ConfigManager& config_manager();
+public:
+    Result initialize();
+    void shutdown();
+    Result load_configuration(const std::string& config_path);
+    Result save_configuration();
 };
 ```
 
-### 6. 事件系统
+#### 1.2 ServiceRegistry
+服务注册表，实现依赖注入模式。
+
+**特点：**
+- 单例模式
+- 线程安全
+- 支持服务生命周期管理
+
+#### 1.3 EventBus
+事件总线，实现发布-订阅模式。
+
+**事件类型：**
+- 播放状态事件
+- 音频格式事件
+- 插件生命周期事件
+- 错误事件
+
+### 2. 音频处理流水线
+
+#### 2.1 解码流程
+```
+Audio File → Format Detector → Decoder Registry → Specific Decoder → Audio Samples
+```
+
+#### 2.2 播放流程
+```
+Audio Samples → Sample Rate Converter → Audio Output → Speakers
+```
+
+#### 2.3 关键接口
+
+**IAudioDecoder**
 ```cpp
-class EventBus {
-    template<typename EventType>
-    void publish(const EventType& event);
-
-    template<typename EventType>
-    void subscribe(std::function<void(const EventType&)> handler);
+class IAudioDecoder {
+public:
+    virtual bool can_decode(const std::string& file_path) = 0;
+    virtual Result decode(const std::string& file_path, AudioBuffer& buffer) = 0;
+    virtual AudioFormat get_supported_format() const = 0;
 };
 ```
-- **线程安全**：使用无锁队列实现
-- **事件类型**：播放事件、错误事件、配置变更事件
 
-## 关键特性
-
-- **模块化设计**：每个功能独立，便于维护和扩展
-- **高性能**：零拷贝音频缓冲区，SIMD优化
-- **可扩展**：插件系统支持动态加载
-- **跨平台**：支持主流操作系统
-- **精度可选**：32/64位浮点处理
-- **自适应**：根据CPU负载自动调整重采样质量
-
-## 数据流
-
-### 音频数据流
-```
-1. 音频文件 → 解码器插件 → 原始PCM
-2. PCM → 位深度转换 → 32/64位浮点
-3. 浮点音频 → DSP插件链 → 处理后音频
-4. 处理后音频 → 重采样器 → 目标采样率
-5. 最终音频 → 音频输出插件 → 硬件设备
-```
-
-### 配置数据流
-```
-1. 加载默认配置 (config/default_config.json)
-2. 加载系统配置 (/etc/qoder-foobar/config.json)
-3. 加载用户配置 (~/.qoder-foobar/config.json)
-4. 应用环境变量覆盖 (QODER_*)
-5. 验证配置有效性
-6. 分发到各模块并注册变更监听
-```
-
-## 线程模型
-
-```
-主线程 (UI/控制)
-├── 音频线程 (实时音频处理)
-│   ├── 解码线程池
-│   ├── DSP处理线程
-│   └── 输出线程
-├── 插件管理线程
-│   ├── 插件扫描
-│   ├── 加载/卸载
-│   └── 依赖解析
-└── 文件I/O线程
-    ├── 配置文件读写
-    ├── 日志写入
-    └── 元数据缓存
-```
-
-## 内存管理
-
-### RAII和智能指针
+**ISampleRateConverter**
 ```cpp
-class AudioPlayer {
-private:
-    std::unique_ptr<IAudioOutput> output_;
-    std::shared_ptr<AudioBuffer> buffer_;
-    std::weak_ptr<PluginManager> plugin_mgr_;
+class ISampleRateConverter {
+public:
+    virtual Result convert(const AudioBuffer& input,
+                          AudioBuffer& output,
+                          double ratio) = 0;
+    virtual void set_quality(ConversionQuality quality) = 0;
 };
 ```
 
-### 音频缓冲区管理
+### 3. 插件系统
+
+#### 3.1 插件架构
+
+**插件生命周期：**
+1. 加载 (Load)
+2. 初始化 (Initialize)
+3. 激活 (Activate)
+4. 停用 (Deactivate)
+5. 卸载 (Unload)
+
+**插件类型：**
+- 输入插件 (解码器)
+- 输出插件 (音频设备)
+- DSP 插件 (音效处理)
+- UI 插件 (界面扩展)
+
+#### 3.2 插件管理
+
+**PluginHost**
+- 动态加载/卸载插件
+- 热重载支持
+- 依赖关系管理
+- 版本兼容性检查
+
+**依赖管理策略：**
+- 拓扑排序确定加载顺序
+- 循环依赖检测
+- 版本范围检查
+
+### 4. 配置系统
+
+#### 4.1 配置层次结构
+```
+Global Config
+├── Audio Settings
+│   ├── Sample Rate
+│   ├── Bit Depth
+│   └── Buffer Size
+├── Plugin Config
+│   ├── Enabled Plugins
+│   └── Plugin Settings
+└── User Preferences
+    ├── UI Settings
+    └── Playback Settings
+```
+
+#### 4.2 配置持久化
+- JSON 格式存储
+- 原子写入保证
+- 备份机制
+
+### 5. foobar2000 兼容层
+
+#### 5.1 兼容性策略
+
+**API 映射：**
+- Service 接口适配
+- 事件系统桥接
+- 数据结构转换
+
+**插件加载：**
+- DLL/SO 动态加载
+- ABI 兼容性处理
+- API 版本检查
+
+#### 5.2 核心适配器
+
+**Input Decoder Adapter**
 ```cpp
-class AudioBufferPool {
-    std::unique_ptr<AudioBuffer> acquire(int size);
-    void release(std::unique_ptr<AudioBuffer> buffer);
-private:
-    std::queue<std::unique_ptr<AudioBuffer>> available_;
-    std::mutex mutex_;
+class InputDecoderAdapter : public AdapterBase {
+public:
+    bool initialize() override;
+    Result load_plugin(const std::string& plugin_path);
+    AudioFormat get_supported_formats() const;
 };
 ```
 
-## 错误处理
+## 设计模式应用
 
-### Result类型
-```cpp
-template<typename T>
-class Result {
-    static Result<T> success(T value);
-    static Result<T> error(const std::string& error);
-    bool is_success() const;
-    const T& value() const;
-    const std::string& error() const;
-};
-```
+### 1. 工厂模式
+- AudioOutputFactory: 创建平台特定的音频输出
+- DecoderFactory: 创建格式特定的解码器
 
-### 异常策略
-- **音频线程**：不抛出异常，返回错误状态
-- **UI线程**：使用try-catch处理用户操作
-- **插件沙箱**：隔离插件异常，记录日志
+### 2. 策略模式
+- SampleRateConverter: 多种重采样算法
+- AudioOutput: 多种音频后端
+
+### 3. 观察者模式
+- EventBus: 事件分发机制
+- ConfigManager: 配置变更通知
+
+### 4. 单例模式
+- ServiceRegistry: 全局服务管理
+- PluginHost: 插件生命周期管理
+
+### 5. 适配器模式
+- FoobarCompatManager: foobar2000 兼容性
+- PlatformAdapter: 跨平台抽象
 
 ## 性能优化
 
-### 1. SIMD优化
-```cpp
-#ifdef __SSE2__
-void process_audio_sse(float* data, int frames) {
-    // 使用SSE2指令集并行处理
-}
-#endif
-```
+### 1. 内存管理
+- 智能指针避免内存泄漏
+- 内存池减少分配开销
+- 零拷贝优化音频数据传输
 
-### 2. 零拷贝设计
-- 音频缓冲区使用指针传递
-- 避免不必要的内存拷贝
-- 移动语义优化大对象传递
+### 2. 并发设计
+- 线程池处理 I/O 操作
+- 无锁数据结构减少竞争
+- 原子操作保证线程安全
 
-### 3. 内存预分配
-- 音频缓冲区池化
-- 预分配FFT工作空间
-- 避免实时内存分配
+### 3. 缓存策略
+- 元数据缓存
+- 音频数据预读
+- 解码结果缓存
 
-## 扩展点
+## 安全考虑
 
-### 1. 新插件类型
-```cpp
-enum class PluginType {
-    AudioDecoder = 1,
-    DSPProcessor = 2,
-    AudioOutput = 3,
-    Visualization = 4,
-    MetadataReader = 5,    // 新增
-    PlaylistManager = 6    // 新增
-};
-```
+### 1. 插件沙箱
+- API 权限控制
+- 资源访问限制
+- 异常隔离
 
-### 2. 新音频后端
-```cpp
-// 添加新的平台支持
-#ifdef HAVE_JACK_AUDIO
-    #include "platform/jack_audio_output.h"
-    REGISTER_AUDIO_OUTPUT(jack, JackAudioOutput);
-#endif
+### 2. 输入验证
+- 文件格式验证
+- 参数边界检查
+- 缓冲区溢出防护
 
-#ifdef HAVE_PIPEWIRE
-    #include "platform/pipewire_audio_output.h"
-    REGISTER_AUDIO_OUTPUT(pipewire, PipeWireAudioOutput);
-#endif
-```
+### 3. 错误处理
+- 异常安全保证
+- 优雅降级机制
+- 错误日志记录
 
-### 3. 新配置模块
-```cpp
-struct NetworkConfig {
-    bool enable_streaming = false;
-    std::string server_url;
-    int buffer_size = 32768;
-    int reconnect_timeout = 5000;
-};
-```
+## 扩展性设计
 
-### 4. 新DSP效果
-```cpp
-class ReverbProcessor : public IDSPProcessor {
-    bool configure(const AudioFormat& format) override;
-    int process(float* input, float* output, int frames) override;
+### 1. 接口抽象
+- 清晰的模块边界
+- 版本化 API
+- 向后兼容性
 
-    void set_room_size(double size);
-    void set_damping(double damping);
-    void set_wet_level(double level);
-};
-```
+### 2. 热更新支持
+- 插件热加载
+- 配置热更新
+- 代码热重载
 
-## 构建系统
+### 3. 多语言支持
+- C 接口规范
+- 语言绑定框架
+- 插件开发工具
 
-### CMake模块化设计
-```
-CMakeLists.txt (根)
-├── config/CMakeLists.txt
-├── core/CMakeLists.txt
-├── src/CMakeLists.txt
-├── sdk/CMakeLists.txt
-└── plugins/CMakeLists.txt
-```
+## 平台特性
 
-### 依赖管理
-- **必需依赖**：CMake 3.20+, C++17, nlohmann/json
-- **可选依赖**：ALSA, PulseAudio, FFmpeg
-- **自动检测**：cmake/AudioBackend.cmake
+### Windows
+- WASAPI 音频输出
+- COM 接口支持
+- 注册表集成
+
+### Linux
+- ALSA/PulseAudio 支持
+- POSIX 接口使用
+- 包管理器集成
+
+### macOS
+- CoreAudio 集成
+- Bundle 结构
+- App Store 兼容
+
+## 未来规划
+
+### 短期目标
+- 完善可视化引擎
+- 增加更多音频格式支持
+- 优化资源使用
+
+### 长期目标
+- WebAssembly 支持
+- 分布式音频处理
+- AI 音频增强
+
+## 总结
+
+Qoder Foobar 的架构设计遵循了模块化、可扩展和跨平台的原则。通过清晰的分层设计和接口抽象，系统具有良好的可维护性和扩展性。插件系统和 foobar2000 兼容层为用户提供了丰富的功能和生态支持。
