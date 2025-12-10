@@ -12,34 +12,6 @@
 namespace foobar2000_sdk {
 
 //==============================================================================
-// field_value 实现
-//==============================================================================
-
-const std::string& field_value::join(const std::string& separator) {
-    if (cache_valid) {
-        return joined_cache;
-    }
-    
-    if (values.empty()) {
-        joined_cache.clear();
-        cache_valid = true;
-        return joined_cache;
-    }
-    
-    std::ostringstream oss;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-            oss << separator;
-        }
-        oss << values[i];
-    }
-    
-    joined_cache = oss.str();
-    cache_valid = true;
-    return joined_cache;
-}
-
-//==============================================================================
 // file_info_impl 实现
 //==============================================================================
 
@@ -106,17 +78,17 @@ std::string file_info_impl::normalize_field_name(const std::string& name) const 
     return normalized.substr(start, end - start + 1);
 }
 
-file_info_impl::field_value& file_info_impl::get_or_create_field(const char* name) {
+foobar2000_sdk::field_value& file_info_impl::get_or_create_field(const char* name) {
     std::string normalized_name = normalize_field_name(name);
-    
+
     auto it = meta_fields_.find(normalized_name);
     if (it == meta_fields_.end()) {
         // 创建新字段
-        field_value new_field;
+        foobar2000_sdk::field_value new_field;
         auto result = meta_fields_.emplace(normalized_name, std::move(new_field));
         it = result.first;
     }
-    
+
     return it->second;
 }
 
@@ -297,7 +269,7 @@ void file_info_impl::copy_from(const file_info_interface& other) {
         *this = file_info_impl();  // 重置
         
         // 复制音频信息
-        audio_info_ = static_cast<const audio_info_impl&>(other.get_audio_info());
+        audio_info_ = other.get_audio_info();
         
         // 复制文件统计
         stats_ = other.get_file_stats();
@@ -324,9 +296,8 @@ void file_info_impl::merge_from(const file_info_interface& other) {
     std::lock_guard<std::mutex> lock(mutex_);
     
     // 合并音频信息（保留非零值）
-    const audio_info_impl& other_audio = 
-        static_cast<const audio_info_impl&>(other.get_audio_info());
-    
+    const audio_info& other_audio = other.get_audio_info();
+
     if (other_audio.m_sample_rate != 0) audio_info_.m_sample_rate = other_audio.m_sample_rate;
     if (other_audio.m_channels != 0) audio_info_.m_channels = other_audio.m_channels;
     if (other_audio.m_bitrate != 0) audio_info_.m_bitrate = other_audio.m_bitrate;

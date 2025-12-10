@@ -15,7 +15,6 @@ namespace foobar2000_sdk {
 // 前向声明
 class service_base;
 class service_factory_base;
-class service_ptr;
 
 // GUID 结构 is defined in foobar2000_sdk.h, using that definition
 // We only add comparison operators here if needed

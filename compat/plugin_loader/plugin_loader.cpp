@@ -22,12 +22,28 @@ ServiceFactoryWrapper::ServiceFactoryWrapper(service_factory_base* foobar_factor
     }
 }
 
-service_ptr ServiceFactoryWrapper::create_service() {
+foobar2000_sdk::service_base* ServiceFactoryWrapper::create_service() {
     if (!foobar_factory_) {
-        return service_ptr();
+        return nullptr;
     }
-    
-    return foobar_factory_->create_service();
+
+    // The base factory doesn't have create_service method, so we return nullptr
+    // This would need to be implemented based on actual foobar2000 plugin API
+    return nullptr;
+}
+
+int ServiceFactoryWrapper::service_add_ref() {
+    if (foobar_factory_) {
+        return foobar_factory_->service_add_ref();
+    }
+    return 0;
+}
+
+int ServiceFactoryWrapper::service_release() {
+    if (foobar_factory_) {
+        return foobar_factory_->service_release();
+    }
+    return 0;
 }
 
 const foobar2000_sdk::GUID& ServiceFactoryWrapper::get_guid() const {

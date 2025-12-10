@@ -1,35 +1,56 @@
 /**
  * @file file_info_types.h
- * @brief file_info 相关类型定义
- * @date 2025-12-09
+ * @brief File info type definitions for foobar2000 compatibility
+ * @date 2025-12-10
  */
 
 #pragma once
 
-#include <cstdint>
+#include <string>
+#include <map>
+#include <vector>
 
 namespace foobar2000_sdk {
 
-// 音频信息结构
-struct audio_info {
-    uint32_t m_sample_rate;      // 采样率
-    uint32_t m_channels;         // 通道数
-    uint32_t m_bitrate;          // 比特率
-    double   m_length;           // 时长（秒）
-    
-    audio_info() : m_sample_rate(44100), m_channels(2), m_bitrate(0), m_length(0) {}
+// File information field types
+enum class field_type {
+    field_string,
+    field_integer,
+    field_boolean,
+    field_time,
+    field_length
 };
 
-typedef audio_info audio_info_impl;
+// Metadata item structure
+struct MetadataItem {
+    std::string name;
+    std::string value;
+    field_type type;
 
-// 文件统计信息
-struct file_stats {
-    uint64_t m_size;             // 文件大小
-    uint64_t m_timestamp;        // 时间戳
-    
-    file_stats() : m_size(0), m_timestamp(0) {}
+    MetadataItem() : type(field_type::field_string) {}
+
+    MetadataItem(const std::string& n, const std::string& v, field_type t = field_type::field_string)
+        : name(n), value(v), type(t) {}
 };
 
-// 重采样模式在 audio_chunk_interface.h 中定义
+// Replay gain information
+struct replaygain_info {
+    float album_gain;
+    float album_peak;
+    float track_gain;
+    float track_peak;
+
+    replaygain_info()
+        : album_gain(0.0f), album_peak(0.0f)
+        , track_gain(0.0f), track_peak(0.0f) {}
+};
+
+// File info flags
+enum file_info_flags {
+    flag_format_specific = 1 << 0,
+    flag_test_only = 1 << 1,
+    flag_lossy = 1 << 2,
+    flag_gapless = 1 << 3
+};
 
 } // namespace foobar2000_sdk

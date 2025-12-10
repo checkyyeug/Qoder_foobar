@@ -15,16 +15,6 @@
 
 namespace foobar2000_sdk {
 
-// service_ptr 的私有实现方法
-void service_ptr::add_ref() {
-    if (ptr_) {
-        ptr_->service_add_ref();
-    }
-}
-
-// service_ptr::release() 现在直接在头文件中实现
-// 这里不再需要单独的实现
-
 // 全局服务列表（简化版本）
 static std::mutex g_service_mutex;
 static std::vector<service_factory_base*> g_service_factories;

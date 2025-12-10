@@ -1,8 +1,6 @@
 #include "mp_plugin.h"
 #include "mp_decoder.h"
 
-// Define MINIMP3_IMPLEMENTATION before including the header
-#define MINIMP3_IMPLEMENTATION
 #define MINIMP3_FLOAT_OUTPUT  // We want float output for DSP processing
 #include "../../sdk/external/minimp3/minimp3_ex.h"
 

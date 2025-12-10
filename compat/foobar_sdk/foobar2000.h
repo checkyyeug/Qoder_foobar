@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstring>
 
 // Platform-specific definitions
 #ifdef _WIN32
@@ -40,6 +41,13 @@ struct GUID {
         return Data1 == other.Data1 && Data2 == other.Data2 &&
                Data3 == other.Data3 &&
                memcmp(Data4, other.Data4, 8) == 0;
+    }
+
+    bool operator<(const GUID& other) const {
+        if (Data1 != other.Data1) return Data1 < other.Data1;
+        if (Data2 != other.Data2) return Data2 < other.Data2;
+        if (Data3 != other.Data3) return Data3 < other.Data3;
+        return memcmp(Data4, other.Data4, 8) < 0;
     }
 };
 
@@ -242,8 +250,8 @@ public:
     virtual void set_meta(const char* key, const char* value) = 0;
     virtual const char* get_meta(const char* key) const = 0;
     virtual void remove_meta(const char* key) = 0;
-    virtual int64_t get_length() const = 0;
-    virtual void set_length(int64_t length) = 0;
+    // Note: get_length and set_length already defined above with double type
+    virtual void set_length_int64(int64_t length) = 0;
     virtual void set_property(const char* key, const char* value) = 0;
     virtual const char* get_property(const char* key) const = 0;
 };
@@ -306,7 +314,7 @@ namespace service_ids {
     extern const GUID input_decoder_v2;
     extern const GUID metadb_v2;
     extern const GUID output_v2;
-    extern const guid_playback_control_v2;
+    extern const GUID playback_control_v2;
 }
 
 namespace input_decoders {
@@ -322,5 +330,5 @@ namespace input_decoders {
 extern "C" {
     typedef FOOBAR2000_EXPORT int (FOOBAR2000_CALL* init_stage_t)(const foobar2000::initquit_t*);
     typedef FOOBAR2000_EXPORT void (FOOBAR2000_CALL* quit_stage_t)();
-    typedef FOOBAR2000_EXPORT bool (FOOBAR2000_CALL* service_query_t)(const GUID&, void**);
+    typedef FOOBAR2000_EXPORT bool (FOOBAR2000_CALL* service_query_t)(const foobar2000::GUID&, void**);
 }

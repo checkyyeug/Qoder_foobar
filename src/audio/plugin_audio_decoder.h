@@ -56,7 +56,7 @@ public:
 private:
     // Plugin management
     mp::compat::FoobarPluginLoader* plugin_loader_;
-    std::unique_ptr<mp::compat::ServiceRegistryBridge> service_bridge_;
+    // std::unique_ptr<mp::compat::ServiceRegistryBridge> service_bridge_;
 
     // Current decoder instance
     foobar2000::service_ptr_t<foobar2000::input_decoder> current_decoder_;
@@ -67,7 +67,7 @@ private:
     std::vector<Metadata> metadata_;
 
     // Sample rate conversion (if needed)
-    std::unique_ptr<ISampleRateConverter> resampler_;
+    std::unique_ptr<audio::ISampleRateConverter> resampler_;
     int target_sample_rate_;
 
     // Internal buffer for converted data
@@ -76,7 +76,7 @@ private:
     // Plugin registration
     bool initialize_plugin_system();
     void register_known_decoders();
-    foobar2000::service_ptr_t<foobar2000::input_decoder> find_decoder_for_file(const char* path);
+    foobar2000::service_ptr_t<foobar2000::input_decoder> find_decoder_for_file(const char* path) const;
 
 public:
     /**

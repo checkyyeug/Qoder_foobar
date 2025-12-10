@@ -15,7 +15,7 @@ namespace foobar2000 {
 /**
  * @brief Concrete input decoder implementation
  */
-class InputDecoderImpl : public service_base_impl {
+class InputDecoderImpl : public input_decoder {
 private:
     GUID class_guid_;
     std::string format_name_;
@@ -25,8 +25,8 @@ public:
     InputDecoderImpl(const char* format_name, const char* extension, const GUID& guid);
     virtual ~InputDecoderImpl() = default;
 
-    // service_base implementation
-    const GUID* service_get_class_guid() override {
+    // service_get_class_guid implementation
+    virtual const GUID* service_get_class_guid() {
         return &class_guid_;
     }
 

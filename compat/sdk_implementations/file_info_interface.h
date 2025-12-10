@@ -15,23 +15,6 @@
 namespace foobar2000_sdk {
 
 /**
- * @struct field_value
- * @brief 存储字段值，支持多值
- */
-struct field_value {
-    std::vector<std::string> values;  // 多值存储
-    std::string joined_cache;         // 缓存连接值（逗号分隔）
-    bool cache_valid = false;
-    
-    /**
-     * @brief 将多个值连接为 foobar2000 风格的字符串
-     * @param separator 分隔符，默认为 "; "
-     * @return 连接后的字符串
-     */
-    const std::string& join(const std::string& separator = "; ");
-};
-
-/**
  * @class file_info_interface
  * @brief file_info 抽象接口（纯虚类）
  */

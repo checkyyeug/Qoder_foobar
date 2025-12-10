@@ -11,6 +11,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <cstring>
 
 // 平台相关定义
 #ifdef _WIN32

@@ -14,7 +14,7 @@
 #include <iostream>
 
 // External service query function
-extern "C" bool FOOBAR2000_GUID service_query(const foobar2000::GUID&, void**);
+extern "C" FOOBAR2000_EXPORT bool service_query(const foobar2000::GUID&, void**);
 
 // Static factory members
 std::unique_ptr<PluginAudioDecoder> PluginAudioDecoderFactory::shared_decoder_;
@@ -30,8 +30,8 @@ PluginAudioDecoder::PluginAudioDecoder(mp::compat::FoobarPluginLoader* plugin_lo
     if (!plugin_loader_) {
         auto compat_manager = std::make_unique<mp::compat::FoobarCompatManager>();
         plugin_loader_ = new mp::compat::FoobarPluginLoader(compat_manager.get());
-        service_bridge_ = std::make_unique<mp::compat::ServiceRegistryBridgeImpl>(
-            /*service_registry=*/nullptr); // We'll need to integrate with actual registry
+        // service_bridge_ = std::make_unique<mp::compat::ServiceRegistryBridge>(
+        //     /*service_registry=*/nullptr); // We'll need to integrate with actual registry
     }
 }
 
@@ -39,7 +39,7 @@ PluginAudioDecoder::~PluginAudioDecoder() {
     close_file();
 
     // Clean up if we own the loader
-    if (service_bridge_ && plugin_loader_) {
+    if (plugin_loader_) {
         delete plugin_loader_;
     }
 }
@@ -79,21 +79,22 @@ void PluginAudioDecoder::register_known_decoders() {
     // Register built-in decoders
     using namespace foobar2000;
 
+    // TODO: Implement service registration
     // WAV decoder
-    auto wav_decoder = std::make_unique<InputDecoderImpl>("WAV Decoder", "wav", input_decoders::wav);
-    register_service(input_decoders::wav, std::move(wav_decoder));
+    // auto wav_decoder = std::make_unique<InputDecoderImpl>("WAV Decoder", "wav", input_decoders::wav);
+    // register_service(input_decoders::wav, std::move(wav_decoder));
 
     // FLAC decoder
-    auto flac_decoder = std::make_unique<InputDecoderImpl>("FLAC Decoder", "flac", input_decoders::flac);
-    register_service(input_decoders::flac, std::move(flac_decoder));
+    // auto flac_decoder = std::make_unique<InputDecoderImpl>("FLAC Decoder", "flac", input_decoders::flac);
+    // register_service(input_decoders::flac, std::move(flac_decoder));
 
     // MP3 decoder
-    auto mp3_decoder = std::make_unique<InputDecoderImpl>("MP3 Decoder", "mp3", input_decoders::mpg);
-    register_service(input_decoders::mpg, std::move(mp3_decoder));
+    // auto mp3_decoder = std::make_unique<InputDecoderImpl>("MP3 Decoder", "mp3", input_decoders::mpg);
+    // register_service(input_decoders::mpg, std::move(mp3_decoder));
 
     // PCM decoder
-    auto pcm_decoder = std::make_unique<InputDecoderImpl>("PCM Decoder", "pcm", input_decoders::pcm);
-    register_service(input_decoders::pcm, std::move(pcm_decoder));
+    // auto pcm_decoder = std::make_unique<InputDecoderImpl>("PCM Decoder", "pcm", input_decoders::pcm);
+    // register_service(input_decoders::pcm, std::move(pcm_decoder));
 }
 
 bool PluginAudioDecoder::open_file(const char* path) {
@@ -308,7 +309,7 @@ std::pair<size_t, size_t> PluginAudioDecoder::get_plugin_stats() const {
 }
 
 foobar2000::service_ptr_t<foobar2000::input_decoder>
-PluginAudioDecoder::find_decoder_for_file(const char* path) {
+PluginAudioDecoder::find_decoder_for_file(const char* path) const {
     using namespace foobar2000;
 
     if (!path) return service_ptr_t<input_decoder>();

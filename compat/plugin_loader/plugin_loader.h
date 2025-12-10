@@ -32,7 +32,9 @@
 
 // 使用 foobar2000_sdk 命名空间中的类型
 using foobar2000_sdk::service_factory_base;
-using foobar2000_sdk::service_ptr;
+// Note: service_ptr is not defined, using service_ptr_t instead
+template<typename T>
+using service_ptr = foobar2000_sdk::service_ptr_t<T>;
 using foobar2000_sdk::service_base;
 #ifdef GUID_DEFINED
 // Windows 已经定义了 GUID，使用全局命名空间
@@ -109,7 +111,11 @@ public:
      * @brief 创建服务实例
      * @return 服务指针
      */
-    foobar2000_sdk::service_ptr create_service() override;
+    foobar2000_sdk::service_base* create_service();
+
+    // service_base implementation
+    int service_add_ref() override;
+    int service_release() override;
 
     /**
      * @brief 获取服务 GUID
@@ -334,7 +340,7 @@ public:
      * @param guid 服务 GUID
      * @return 服务实例或 nullptr
      */
-    virtual foobar2000_sdk::service_ptr query_service(const foobar2000_sdk::GUID& guid) = 0;
+    virtual foobar2000_sdk::service_base* query_service(const foobar2000_sdk::GUID& guid) = 0;
 
     /**
      * @brief 按 GUID 查询工厂

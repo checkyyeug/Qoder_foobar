@@ -23,8 +23,8 @@
 #include "audio/enhanced_sample_rate_converter.h"
 #include "audio/adaptive_resampler.h"
 #include "audio/plugin_audio_decoder.h"
-#include "compat/plugin_loader/plugin_loader.h"
-#include "compat/foobar_compat_manager.h"
+#include "../../compat/plugin_loader/plugin_loader.h"
+#include "../../compat/foobar_compat_manager.h"
 
 // Platform-specific audio output
 #ifdef __linux__
@@ -37,6 +37,10 @@
 #include <CoreAudio/AudioHardware.h>
 #include <AudioUnit/AudioUnit.h>
 #endif
+
+// Type aliases for convenience
+using ResampleQuality = audio::ResampleQuality;
+using AdaptiveSampleRateConverter = audio::AdaptiveSampleRateConverter;
 
 // Audio format structure
 struct AudioFormat {
@@ -284,7 +288,7 @@ public:
             // Stop audio output
 #ifdef __linux__
             if (pcm_handle_) {
-                snd_pcm_drain(pcm_handle);
+                snd_pcm_drain(pcm_handle_);
             }
 #elif defined(_WIN32)
             if (ds_buffer_) {
@@ -301,7 +305,7 @@ public:
             state_ = PAUSED;
 #ifdef __linux__
             if (pcm_handle_) {
-                snd_pcm_pause(pcm_handle, 1);
+                snd_pcm_pause(pcm_handle_, 1);
             }
 #elif defined(_WIN32)
             if (ds_buffer_) {
@@ -317,7 +321,7 @@ public:
             state_ = PLAYING;
 #ifdef __linux__
             if (pcm_handle_) {
-                snd_pcm_pause(pcm_handle, 0);
+                snd_pcm_pause(pcm_handle_, 0);
             }
 #elif defined(_WIN32)
             if (ds_buffer_) {

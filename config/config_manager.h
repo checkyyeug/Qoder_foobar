@@ -10,14 +10,11 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <map>
 #include <functional>
 
-// 使用nlohmann/json库
-#ifdef QODER_JSON_USE_HEADER_ONLY
-    #include <nlohmann/json.hpp>
-#else
-    #include <json.hpp>
-#endif
+// Use simple map instead of nlohmann/json
+using json_map = std::map<std::string, std::string>;
 
 namespace qoder {
 

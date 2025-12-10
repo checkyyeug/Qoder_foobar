@@ -32,28 +32,11 @@ namespace foobar2000_sdk {
  */
 class file_info_impl : public file_info_interface {
 private:
-    /**
-     * @struct field_value
-     * @brief 存储字段值，支持多值
-     */
-    struct field_value {
-        std::vector<std::string> values;  // 多值存储
-        std::string joined_cache;         // 缓存连接值（逗号分隔）
-        bool cache_valid = false;
-        
-        /**
-         * @brief 将多个值连接为 foobar2000 风格的字符串
-         * @param separator 分隔符，默认为 "; "
-         * @return 连接后的字符串
-         */
-        const std::string& join(const std::string& separator = "; ");
-    };
-    
     // 元数据字段映射：字段名 -> 值列表
     std::unordered_map<std::string, field_value> meta_fields_;
     
     // 音频信息（采样率、通道数等）
-    audio_info_impl audio_info_;
+    audio_info audio_info_;
     
     // 文件统计信息（大小、时间戳）
     file_stats stats_;
@@ -66,7 +49,7 @@ private:
      * @param name 字段名
      * @return 字段值的引用
      */
-    field_value& get_or_create_field(const char* name);
+    foobar2000_sdk::field_value& get_or_create_field(const char* name);
     
     /**
      * @brief 内部辅助：规范化字段名
@@ -171,9 +154,9 @@ public:
      * @brief 设置音频流信息
      * @param p_info 音频信息
      */
-    void set_audio_info(const audio_info& p_info) override { 
+    void set_audio_info(const audio_info& p_info) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        audio_info_ = static_cast<const audio_info_impl&>(p_info); 
+        audio_info_ = p_info;
     }
     
     /**
