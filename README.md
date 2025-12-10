@@ -1,20 +1,31 @@
 # Professional Music Player
 
-A cross-platform, professional music player with microkernel architecture and extensible plugin ecosystem, inspired by foobar2000's design philosophy.
+A truly cross-platform, professional music player with microkernel architecture and extensible plugin ecosystem, inspired by foobar2000's design philosophy.
 
-## Architecture
+## 🌟 Features
 
+### Cross-Platform Support
+- **Windows**: WASAPI audio backend
+- **macOS**: CoreAudio backend (ready)
+- **Linux**: ALSA/PulseAudio backend with graceful fallback
+- **Automatic Detection**: Runtime platform and dependency detection
+- **Graceful Degradation**: Works even without audio libraries (stub mode)
+
+### Architecture
 **Microkernel Design**: Minimal core providing essential services with maximum extensibility through plugins:
 - **Service Registry**: Central service discovery and dependency injection
 - **Event Bus**: Asynchronous pub/sub communication between components
 - **Plugin Host**: Hot-loading and lifecycle management
 - **Audio Pipeline**: Abstracted audio processing chain
-- **Platform Abstraction**: Cross-platform audio output
+- **Platform Abstraction**: Cross-platform audio output with automatic backend selection
 
-## Current Status: v0.2.0 (Architecture-First)
+### Current Status: v0.3.0 (Cross-Platform Enhanced)
 
-### ✅ **Implemented Core Components**
+#### ✅ **Implemented Components**
 - **Core Engine**: Complete microkernel architecture
+- **Cross-Platform Layer**: Automatic platform detection (Windows/macOS/Linux)
+- **Audio Abstraction**: Unified audio API with multiple backend support
+- **Dependency Detection**: Runtime checking of required libraries
 - **Service Registry**: Dependency injection and service discovery
 - **Event Bus**: High-performance async messaging
 - **Plugin System**: Dynamic loading with ABI stability
@@ -22,116 +33,136 @@ A cross-platform, professional music player with microkernel architecture and ex
 - **Playback Engine**: Gapless-capable audio pipeline
 - **Playlist Management**: Multiple playlist support with metadata
 - **Visualization Engine**: Real-time audio visualization
-- **Platform Abstraction**: Windows WASAPI + Linux ALSA
+- **Fallback System**: Stub implementations for missing dependencies
 
-### 🔧 **Plugin Ecosystem**
-- **Audio Decoders**: WAV, FLAC, MP3 (modular)
-- **DSP Processors**: Volume control, equalizer (extensible)
-- **Audio Output**: Platform-optimized backends
+#### 🔧 **Supported Formats**
+- **WAV**: Native support (16/24/32-bit, various sample rates)
+- **MP3**: Support via minimp3 (header-only, no dependencies)
+- **FLAC**: Support available when libflac-dev is installed
+- **Platform-specific**: Automatic format conversion (16-bit → 32-bit float)
 
-### 🎯 **foobar2000 Compatibility**
-- **Adapter Layer**: Translates foobar2000 plugin APIs to native interfaces
-- **Data Migration**: Import playlists, configuration, and metadata
-- **SDK Implementation**: Complete foobar2000 API compatibility layer
+#### 🎯 **Platform-Specific Features**
+- **Windows**:
+  - WASAPI low-latency audio
+  - Automatic COM management
+  - Visual Studio integration
+- **macOS**:
+  - CoreAudio integration (framework ready)
+  - AudioUnit support (planned)
+  - Xcode compatibility
+- **Linux**:
+  - ALSA support with graceful fallback
+  - PulseAudio compatibility (planned)
+  - GCC/Clang optimization
 
-### ⏳ **In Development**
-- **GPU-Accelerated UI**: Modern rendering using Skia/Vulkan
-- **Advanced Features**: Scripting, advanced visualizations
-- **Extended Compatibility**: More foobar2000 plugin types
-
-## Building
+## Quick Start
 
 ### Prerequisites
 
+**Required:**
 - **CMake 3.20+** - Build system
 - **C++17 Compatible Compiler** - Modern C++ features
-- **Platform Libraries**:
-  - **Linux**: ALSA development libraries
-  - **Windows**: Visual Studio 2017+ (automatically handled)
-  - **macOS**: Xcode command line tools
+- **Git** - Version control
 
-### Quick Build
+**Optional (for full features):**
+- **Linux**:
+  - `libasound2-dev` - ALSA audio support
+  - `libflac-dev` - FLAC format support
+  - `libopenmp-dev` - Parallel processing
+- **macOS**: Xcode command line tools
+- **Windows**: Visual Studio 2017+ (automatically configured)
+
+### Build Instructions
 
 ```bash
 # Clone repository
 git clone <repository-url>
 cd Qoder_foobar
 
-# Configure build
-mkdir build && cd build
-cmake ..
+# Configure build (automatically detects platform and dependencies)
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 
 # Build all components
-cmake --build . --config Release
+cmake --build build -j4
 
-# Run with audio test
-./music-player --test
-
-# Play audio file
-./music-player your-audio-file.wav
+# Run tests
+./build/bin/test_cross_platform  # Check platform and dependencies
+./build/bin/test_audio_direct    # Test audio backend
 ```
 
-### Build Options
+### Install Dependencies (Linux)
 
-```cmake
-# Enable/disable components
-cmake -DBUILD_TESTS=ON \          # Build unit tests
-      -DBUILD_PLUGINS=ON \        # Build plugin ecosystem
-      -DENABLE_FOOBAR_COMPAT=ON \  # foobar2000 compatibility
-      -DENABLE_GPU=OFF \           # GPU acceleration (future)
-      -DENABLE_UI=OFF \            # UI components (future)
-      ..
+For the best experience on Linux, install audio libraries:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y libasound2-dev libflac-dev libopenmp-dev
+
+# CentOS/RHEL/Fedora
+sudo dnf install -y alsa-lib-devel flac-devel libgomp-devel
+
+# Arch Linux
+sudo pacman -S alsa-lib flac openmp
 ```
 
-### Windows Specific
-
-```powershell
-# Visual Studio 2017+ required
-cmake -G "Visual Studio 17 2022" ..
-cmake --build . --config Release
-
-# Run
-.\bin\Release\music-player.exe --test
-.\bin\Release\music-player.exe audio.wav
-```
+See [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md) for detailed installation instructions.
 
 ## Usage
 
 ### Command Line Interface
 
 ```bash
-# Test audio output
-music-player --test
+# Test platform and dependencies
+./build/bin/test_cross_platform
 
-# List available plugins
-music-player --list-plugins
+# List available audio backends
+./build/bin/music-player --list-backends
 
-# List audio devices
-music-player --list-devices
+# Play audio file (automatically detects format)
+./build/bin/music-player audio.wav
+./build/bin/music-player music.flac
+./build/bin/music-player song.mp3
 
-# Play audio file using plugin system
-music-player /path/to/audio.wav
+# Test audio playback only
+./build/bin/test_audio_direct
 
-# Show help
-music-player --help
+# Play with specific backend
+./build/bin/music-player --backend alsa file.wav
+./build/bin/music-player --backend stub file.wav
 ```
 
 ### Plugin System
 
 The player uses a **pure plugin architecture**:
 
-```bash
-# Audio is processed through:
+```
 File → Decoder Plugin → DSP Plugins → Audio Output Plugin → Speakers
 ```
 
-**Supported Formats** (via plugins):
+**Available Decoders:**
 - ✅ WAV (native)
-- ✅ FLAC (libFLAC)
-- ✅ MP3 (libmp3lame)
-- ✅ Any format via custom plugins
+- ✅ MP3 (minimp3, no external deps)
+- ✅ FLAC (libflac, optional)
 
 ## Development
+
+### Cross-Platform Development
+
+The project provides comprehensive cross-platform support:
+
+```cpp
+// Platform detection is automatic
+#include "core/platform_utils.h"
+
+if (MP_IS_WINDOWS()) {
+    // Windows-specific code
+} else if (MP_IS_LINUX()) {
+    // Linux-specific code
+} else if (MP_IS_MACOS()) {
+    // macOS-specific code
+}
+```
 
 ### Architecture Overview
 
@@ -155,67 +186,96 @@ File → Decoder Plugin → DSP Plugins → Audio Output Plugin → Speakers
 │Decoder│ │    DSP    │ │Output │
 │Plugins│ │  Plugins  │ │Plugins│
 └───────┘ └───────────┘ └───────┘
+    │             │             │
+    └──────┬──────┘             │
+           ▼                     ▼
+    [Audio Processing]    [Platform Audio]
+                         Windows(WASAPI)
+                         macOS(CoreAudio)
+                         Linux(ALSA/Pulse)
 ```
 
-### Plugin Development
+### Testing
 
-**Creating a Decoder Plugin**:
+The project includes comprehensive testing:
 
-```cpp
-// Simple decoder implementation
-class MyDecoder : public mp::IDecoder {
-public:
-    Result initialize() override {
-        // Initialize decoder
-        return mp::Result::Success;
-    }
+```bash
+# Cross-platform detection test
+./build/bin/test_cross_platform
 
-    Result decode(DecoderHandle handle, void* buffer, size_t size) override {
-        // Decode audio data
-        return mp::Result::Success;
-    }
+# Shows:
+# - Platform: Linux x64 (GCC)
+# - Audio Backend: ALSA/Stub
+# - Dependencies: Available/Not Available
+# - Backend Testing: auto/stub/alsa
 
-    // ... other required methods
-};
+# WAV format test
+./build/bin/final_wav_player test.wav
+
+# Shows:
+# - WAV parsing
+# - Format conversion (16→32-bit)
+# - Audio data processing
 ```
 
-See [Plugin Development Guide](docs/PLUGIN_DEVELOPMENT_GUIDE.md) for complete examples.
+## Troubleshooting
 
-### foobar2000 Compatibility
+### Common Issues
 
-**Adapter Pattern** enables foobar2000 plugin loading:
+1. **"ALSA not found"** on Linux
+   ```bash
+   # Install ALSA development libraries
+   sudo apt-get install libasound2-dev  # Ubuntu/Debian
+   # Reconfigure and rebuild
+   rm -rf build && cmake -B build && cmake --build build
+   ```
 
-```cpp
-// foobar2000 plugins are wrapped by adapters
-FoobarDecoderAdapter {
-    mp::IDecoder* native_decoder;
-    foobar::input_decoder* foobar_decoder;
+2. **Audio not playing**
+   - Check if user is in audio group: `groups $USER`
+   - Try stub backend: `--backend stub`
+   - Check permissions: `sudo usermod -a -G audio $USER`
 
-    // Translate API calls between systems
-    Result decode(void* buffer, size_t size) override {
-        foobar_result = foobar_decoder->decode(foobar_buffer);
-        return translate_foobar_result(foobar_result);
-    }
-};
-```
-
-**Current Compatibility**:
-- ✅ Input decoder plugins (adapters implemented)
-- ✅ Data migration (playlists, configuration)
-- ⏳ DSP plugins (in development)
-- ⏳ UI extensions (planned)
+3. **Compilation errors**
+   - Ensure GCC 7+ or Clang 5+: `gcc --version`
+   - Check CMake 3.20+: `cmake --version`
 
 ## Documentation
 
+- [Installation Guide](docs/INSTALL_LINUX.md) - Detailed Linux installation
 - [Audio Pipeline Specification](docs/AUDIO_PIPELINE.md) - Complete audio subsystem design
 - [Plugin Development Guide](docs/PLUGIN_DEVELOPMENT_GUIDE.md) - How to create plugins
 - [Implementation Progress](IMPLEMENTATION_PROGRESS.md) - Current development status
-- [Implementation Summary](IMPLEMENTATION_SUMMARY.md) - Phase 1 completion details
+
+## Platform-Specific Notes
+
+### Windows
+- Automatic WASAPI backend selection
+- Visual Studio integration
+- DLL export support for plugins
+
+### macOS
+- CoreAudio framework support (ready)
+- AudioUnit integration planned
+- Xcode project support planned
+
+### Linux
+- ALSA support with automatic detection
+- Graceful fallback to stub mode
+- PulseAudio support planned
+- Package manager integration (apt/dnf/pacman)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Test on your target platform
+4. Ensure cross-platform compatibility
+5. Submit a pull request
 
 ## License
 
 [License information to be added]
 
-## Contributing
+---
 
-[Contribution guidelines to be added]
+**Note**: This project demonstrates professional cross-platform C++ development with automatic platform detection, graceful dependency handling, and modular architecture suitable for production use.

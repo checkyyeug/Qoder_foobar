@@ -12,10 +12,12 @@
 #include "common_includes.h"
 #include "metadb_handle_interface.h"
 #include "file_info_impl.h"
+#include "file_info_types.h"
 #include "../../sdk/headers/mp_types.h"
 #include <memory>
 #include <string>
 #include <chrono>
+#include <mutex>
 
 namespace foobar2000_sdk {
 

@@ -138,19 +138,37 @@ public:
         // Convert to system format if needed
         bool needs_resample = (sample_rate != system_format_->nSamplesPerSec) ||
                              (channels != system_format_->nChannels);
-        
-        if (needs_resample) {
-            std::cout << "⚠️  Note: Format mismatch detected" << std::endl;
-            std::cout << "  File: " << sample_rate << " Hz, " << channels << " channels" << std::endl;
-            std::cout << "  System: " << system_format_->nSamplesPerSec << " Hz, " 
-                     << system_format_->nChannels << " channels" << std::endl;
-            std::cout << "  Will play at system rate (may change pitch/speed)" << std::endl;
+        bool needs_format_convert = (bits != system_format_->wBitsPerSample);
+
+        if (needs_resample || needs_format_convert) {
+            std::cout << "⚠️  Format conversion needed:" << std::endl;
+            std::cout << "  File: " << sample_rate << " Hz, " << channels << " ch, " << bits << "-bit" << std::endl;
+            std::cout << "  System: " << system_format_->nSamplesPerSec << " Hz, "
+                     << system_format_->nChannels << " ch, " << system_format_->wBitsPerSample << "-bit" << std::endl;
         }
-        
-        // Simple streaming - just play the raw data
+
+        // Prepare data for conversion
+        std::vector<float> converted_data;
         const uint8_t* data_ptr = pcm_data;
         const uint8_t* end_ptr = data_ptr + data_size;
         uint32_t bytes_sent = 0;
+
+        // Convert to 32-bit float if needed
+        if (needs_format_convert && bits == 16) {
+            std::cout << "✓ Converting 16-bit to 32-bit float..." << std::endl;
+            uint32_t samples = data_size / 2; // 16-bit = 2 bytes
+            converted_data.resize(samples);
+
+            const int16_t* src = reinterpret_cast<const int16_t*>(pcm_data);
+            for (uint32_t i = 0; i < samples; i++) {
+                converted_data[i] = src[i] / 32768.0f; // Normalize to [-1, 1]
+            }
+
+            data_ptr = reinterpret_cast<const uint8_t*>(converted_data.data());
+            end_ptr = data_ptr + samples * sizeof(float);
+            bits = 32;
+        }
+
         uint32_t block_align = channels * (bits / 8);
         
         auto start_time = std::chrono::steady_clock::now();
@@ -198,6 +216,10 @@ public:
         return true;
     }
 };
+
+#else
+// Linux placeholder - no WASAPI implementation
+#endif
 
 // Parse minimal WAV header
 bool parse_wav_header(const char* filename, uint32_t& data_size, 
@@ -277,8 +299,50 @@ int main(int argc, char** argv) {
     std::cout << "╚══════════════════════════════════════════════╝" << std::endl;
     return 0;
 #else
-    std::cerr << "❌ Windows-only (WASAPI)" << std::endl;
-    return 1;
+    // Linux version - test WAV parsing and format conversion
+    std::cout << "Running Linux version - Testing WAV parsing and format conversion" << std::endl;
+
+    // Parse WAV file
+    uint32_t data_size, sample_rate;
+    uint16_t channels, bits;
+    if (!parse_wav_header(filename, data_size, sample_rate, channels, bits)) {
+        std::cerr << "❌ Failed to parse WAV header" << std::endl;
+        return 1;
+    }
+
+    std::cout << "\n✓ WAV Format:" << std::endl;
+    std::cout << "  Sample Rate: " << sample_rate << " Hz" << std::endl;
+    std::cout << "  Channels: " << channels << std::endl;
+    std::cout << "  Bits: " << bits << std::endl;
+    std::cout << "  Data Size: " << data_size << " bytes" << std::endl;
+
+    // Read audio data
+    std::vector<uint8_t> audio_data(data_size);
+    std::ifstream f(filename, std::ios::binary);
+    f.seekg(44); // Skip header
+    f.read(reinterpret_cast<char*>(audio_data.data()), data_size);
+    f.close();
+
+    std::cout << "✓ Read " << audio_data.size() << " bytes" << std::endl;
+
+    // Test format conversion (16-bit to 32-bit float)
+    if (bits == 16) {
+        std::cout << "\n✓ Testing 16-bit to 32-bit float conversion..." << std::endl;
+
+        uint32_t samples = data_size / 2; // 16-bit = 2 bytes per sample
+        std::vector<float> converted_data(samples);
+
+        const int16_t* src = reinterpret_cast<const int16_t*>(audio_data.data());
+        for (uint32_t i = 0; i < std::min(samples, 1000u); i++) {
+            converted_data[i] = src[i] / 32768.0f;
+        }
+
+        std::cout << "  Converted " << std::min(samples, 1000u) << " samples" << std::endl;
+        std::cout << "  Example: " << src[0] << " -> " << converted_data[0] << std::endl;
+    }
+
+    std::cout << "\n✅ Linux test completed successfully!" << std::endl;
+    std::cout << "  Note: Audio playback requires Windows WASAPI or Linux ALSA" << std::endl;
+    return 0;
 #endif
-}
-#endif 
+} 

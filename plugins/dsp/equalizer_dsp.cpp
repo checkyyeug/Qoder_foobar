@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 #include <vector>
+#include <cstdio>
 
 namespace mp {
 namespace dsp {

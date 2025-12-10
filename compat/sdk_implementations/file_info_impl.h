@@ -11,10 +11,12 @@
 
 #include "common_includes.h"
 #include "file_info_interface.h"
+#include "file_info_types.h"
 #include <unordered_map>
 #include <vector>
 #include <string>
 #include <memory>
+#include <mutex>
 
 namespace foobar2000_sdk {
 

@@ -1,6 +1,8 @@
 #pragma once
 
-#include "mp_audio_output.h"
+#include "../sdk/headers/mp_audio_output.h"
+#include <string>
+#include <vector>
 
 namespace mp {
 namespace platform {
@@ -10,6 +12,13 @@ namespace platform {
 // - Windows: WASAPI
 // - macOS: CoreAudio
 // - Linux: ALSA
+// Fallback: Stub implementation for unsupported platforms
 IAudioOutput* create_platform_audio_output();
+
+// Create audio output with specific backend (for testing/fallback)
+IAudioOutput* create_audio_output(const std::string& backend);
+
+// Get available audio backends
+std::vector<std::string> get_available_audio_backends();
 
 }} // namespace mp::platform

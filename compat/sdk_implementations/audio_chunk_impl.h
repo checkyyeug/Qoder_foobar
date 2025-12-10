@@ -11,6 +11,8 @@
 
 #include "common_includes.h"
 #include "audio_chunk_interface.h"
+#include "audio_sample.h"
+#include "file_info_types.h"
 #include <memory>
 #include <vector>
 #include <cstring>
