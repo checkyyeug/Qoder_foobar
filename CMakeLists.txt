@@ -226,6 +226,39 @@ target_include_directories(final_wav_player PRIVATE
 
 target_link_libraries(final_wav_player PRIVATE Threads::Threads)
 
+# Universal Sample Rate Converter Test
+add_executable(test-universal-converter
+    src/audio/universal_sample_rate_converter.cpp
+    src/audio/sample_rate_converter.cpp
+    src/audio/wav_writer.cpp
+    src/audio/test_universal_converter.cpp
+)
+
+target_include_directories(test-universal-converter PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test-universal-converter PRIVATE m)
+endif()
+
+# Sample Rate Converter Test
+add_executable(test-resampler
+    src/audio/sample_rate_converter.cpp
+    src/audio/wav_writer.cpp
+    src/audio/test_resampler.cpp
+)
+
+target_include_directories(test-resampler PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(test-resampler PRIVATE m)
+endif()
+
 # ============================================================================
 # Summary
 # ============================================================================
