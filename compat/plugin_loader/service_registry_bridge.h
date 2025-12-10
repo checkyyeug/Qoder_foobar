@@ -75,45 +75,45 @@ public:
      * @param factory_wrapper 包装工厂
      * @return Result 成功或错误
      */
-    Result register_service(const GUID& guid, ServiceFactoryWrapper* factory_wrapper) override;
-    
+    Result register_service(const foobar2000_sdk::GUID& guid, ServiceFactoryWrapper* factory_wrapper) override;
+
     /**
      * @brief 注销服务
      * @param guid 服务 GUID
      * @return Result 成功或错误
      */
-    Result unregister_service(const GUID& guid) override;
-    
+    Result unregister_service(const foobar2000_sdk::GUID& guid) override;
+
     /**
      * @brief 按 GUID 查询服务
      * @param guid 服务 GUID
      * @return 服务实例或 nullptr
      */
-    service_ptr query_service(const GUID& guid) override;
-    
+    foobar2000_sdk::service_ptr query_service(const foobar2000_sdk::GUID& guid) override;
+
     /**
      * @brief 按 GUID 查询工厂
      * @param guid 服务 GUID
      * @return 工厂指针或 nullptr
      */
-    service_factory_base* query_factory(const GUID& guid) override;
-    
+    foobar2000_sdk::service_factory_base* query_factory(const foobar2000_sdk::GUID& guid) override;
+
     /**
      * @brief 获取所有已注册服务
      * @return GUID 向量
      */
-    std::vector<GUID> get_registered_services() const override;
+    std::vector<foobar2000_sdk::GUID> get_registered_services() const override;
     
     /**
      * @brief 获取服务数量
      * @return 服务数量
      */
-    size_t get_service_count() const;
-    
+    size_t get_service_count() const override;
+
     /**
      * @brief 清除所有服务
      */
-    void clear();
+    void clear() override;
 };
 
 // ServiceRegistryBridgeImpl 实现

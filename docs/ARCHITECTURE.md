@@ -1,20 +1,15 @@
-# Qoder foobar v2.0 系统架构文档
+# Qoder foobar v2.0 系统架构
 
-## 概述
+## 项目概述
 
-Qoder foobar v2.0 是一个现代化的、模块化的音乐播放器系统，采用了分层架构设计，支持高性能音频处理、插件扩展和跨平台部署。
+Qoder foobar v2.0 是一个模块化、跨平台的专业音乐播放器，支持：
+- 32/64位浮点音频处理
+- 自适应采样率转换（8kHz - 768kHz）
+- 插件热插拔系统
+- JSON配置管理
+- 多平台音频后端（ALSA/Pulse/WASAPI/CoreAudio）
 
-### 设计原则
-
-1. **模块化**：每个功能模块独立，便于维护和扩展
-2. **可配置性**：通过JSON配置文件和环境变量灵活控制系统行为
-3. **高性能**：优化的音频处理管道，支持32/64位浮点精度
-4. **可扩展性**：插件系统支持动态加载和热插拔
-5. **兼容性**：支持原生SDK和foobar2000插件兼容层
-
-## 系统架构
-
-### 整体架构图
+## 整体架构
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -55,304 +50,202 @@ Qoder foobar v2.0 是一个现代化的、模块化的音乐播放器系统，�
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 核心组件详解
+## 核心组件
 
-### 1. 配置系统 (Configuration System)
-
-配置系统是整个系统的基础，提供统一的配置管理能力：
-
+### 1. 配置系统 (config/)
 ```cpp
-// 配置系统架构
-ConfigManager
-├── 配置加载器 (JSON Parser)
-├── 配置验证器 (Validator)
-├── 环境变量支持 (Environment Variables)
-└── 配置变更通知 (Change Notification)
-
-// 配置数据流
-JSON文件 → ConfigManager → 各模块
-    ↓              ↓              ↓
-验证 → 加载 → 应用 → 通知
+// 主要接口
+class ConfigManager {
+    bool initialize(const std::string& config_file = "");
+    const AppConfig& get_config() const;
+    template<typename T> void set_config_value(const std::string& path, const T& value);
+    void add_change_callback(std::function<void(const AppConfig&)> callback);
+};
 ```
+- **配置文件层次**：命令行 > ~/.qoder-foobar/ > /etc/ > 安装目录 > 源码目录
+- **环境变量覆盖**：QODER_AUDIO_*, QODER_RESAMPLER_*, QODER_LOGGING_*
+- **实时更新**：配置变更自动通知到各模块
+- **验证机制**：自动验证配置值的有效范围
 
-**主要特性**：
-- JSON格式配置文件
-- 环境变量覆盖
-- 分层配置结构
-- 配置验证
-- 热重载支持
-- 变更通知机制
-
-### 2. 插件系统 (Plugin System)
-
-插件系统是可扩展性的核心，支持两种插件架构：
-
-#### 2.1 Native Plugin SDK
+### 2. 插件系统 (sdk/, compat/, plugins/)
 ```cpp
-// 插件接口层次
-IPlugin (基础接口)
-├── IDecoder (解码器)
-├── IDSPProcessor (DSP处理器)
-├── IAudioOutput (音频输出)
-└── IVisualization (可视化)
+// 核心插件接口
+class IPlugin {
+    virtual bool initialize() = 0;
+    virtual PluginInfo get_info() const = 0;
+    virtual PluginState get_state() const = 0;
+};
+
+class IAudioDecoder : public IPlugin {
+    virtual bool can_decode(const std::string& file_path) = 0;
+    virtual int decode(AudioBuffer& buffer, int max_frames) = 0;
+    virtual AudioFormat get_format() const = 0;
+};
 ```
+- **双SDK架构**：Native SDK + foobar2000兼容层
+- **插件类型**：解码器、DSP处理器、音频输出、可视化
+- **热插拔**：运行时动态加载/卸载
+- **依赖管理**：自动解析插件依赖关系
+- **沙箱隔离**：插件异常不影响主程序
 
-#### 2.2 foobar2000 兼容层
-```cpp
-// 兼容层架构
-foobar2000 Plugin → Adapter Wrapper → Native Interface
-       ↓                    ↓                  ↓
-  Services/Components → Service Mapping → Standard Methods
+### 3. 音频处理管道 (src/audio/)
 ```
-
-**插件加载流程**：
-1. 插件发现和扫描
-2. 依赖解析
-3. 动态库加载
-4. 接口适配
-5. 生命周期管理
-
-### 3. 音频处理管道 (Audio Processing Pipeline)
-
-音频处理管道是系统的核心，处理从解码到输出的整个流程：
-
-```
-音频文件 → 解码器 → 原始PCM → DSP处理器 → 重采样器 → 音频输出 → 硬件
-    ↓          ↓        ↓          ↓         ↓          ↓
-  File → Format → Audio → Effects → Rate Convert → Backend → Device
+音频文件 → 解码器插件 → PCM数据 → DSP插件 → 重采样器 → 音频输出插件 → 硬件
 ```
 
 #### 3.1 重采样系统
-
-重采样系统支持多种精度和算法：
-
 ```cpp
-// 重采样架构
-ISampleRateConverter
-├── LinearSampleRateConverter      (32位)
-├── CubicSampleRateConverter       (32位)
-├── SincSampleRateConverter        (32位)
-├── LinearSampleRateConverter64     (64位)
-├── CubicSampleRateConverter64      (64位)
-├── SincSampleRateConverter64       (64位)
-└── AdaptiveSampleRateConverter     (自适应)
+// 精度选择
+class ConfiguredSampleRateConverter {
+    bool configure(int input_rate, int output_rate, int channels);
+    void set_precision(int bits); // 32或64位
+};
+
+// 算法实现
+- LinearSampleRateConverter     // 线性插值（最快）
+- CubicSampleRateConverter      // 三次插值（平衡）
+- SincSampleRateConverter       // Sinc插值（高质量）
+- AdaptiveSampleRateConverter  // 自适应选择
 ```
 
-**算法特性对比**：
-- **精度**：32位 vs 64位浮点
-- **质量**：速度 vs 质量权衡
-- **自适应**：根据CPU负载自动选择
-
-### 4. 跨平台抽象
-
-平台抽象层隐藏了不同操作系统的差异：
-
+#### 3.2 64位浮点支持
 ```cpp
-// 平台特定实现
-IAudioOutput
-├── WindowsAudioOutput (WASAPI)
-├── MacOSAudioOutput   (CoreAudio)
-├── LinuxAudioOutput   (ALSA/Pulse)
-└── StubAudioOutput     (无音频)
+class ISampleRateConverter64 {
+    virtual bool configure(int input_rate, int output_rate, int channels) = 0;
+    virtual int process(const double* input, double* output, int input_frames) = 0;
+};
 ```
+- **动态范围**：32位(~150dB) vs 64位(~320dB)
+- **性能开销**：64位CPU使用率增加30-40%
+- **适用场景**：专业音频制作使用64位，一般播放32位足够
+
+### 4. 跨平台音频抽象 (src/audio/, platform/)
+```cpp
+class AudioOutputBase : public IAudioOutput {
+    bool set_volume(double volume) override;
+    bool set_mute(bool mute) override;
+protected:
+    virtual bool do_initialize() = 0;
+    virtual int do_write(const float* data, int frames) = 0;
+};
+```
+
+#### 平台实现
+- **Linux**:
+  - ALSA直接输出（低延迟）
+  - PulseAudio输出（混音支持）
+  - 自动检测，优先PulseAudio
+- **Windows**: WASAPI（独占/共享模式）
+- **macOS**: CoreAudio（低延迟音频单元）
+
+### 5. 核心引擎 (core/)
+```cpp
+class CoreEngine {
+    bool load_file(const std::string& path);
+    bool play();
+    bool pause();
+    bool stop();
+
+    // 插件管理
+    PluginManager& plugin_manager();
+
+    // 配置访问
+    ConfigManager& config_manager();
+};
+```
+
+### 6. 事件系统
+```cpp
+class EventBus {
+    template<typename EventType>
+    void publish(const EventType& event);
+
+    template<typename EventType>
+    void subscribe(std::function<void(const EventType&)> handler);
+};
+```
+- **线程安全**：使用无锁队列实现
+- **事件类型**：播放事件、错误事件、配置变更事件
+
+## 关键特性
+
+- **模块化设计**：每个功能独立，便于维护和扩展
+- **高性能**：零拷贝音频缓冲区，SIMD优化
+- **可扩展**：插件系统支持动态加载
+- **跨平台**：支持主流操作系统
+- **精度可选**：32/64位浮点处理
+- **自适应**：根据CPU负载自动调整重采样质量
 
 ## 数据流
 
 ### 音频数据流
-
 ```
-原始音频文件 → 解码
-├── WAV: 原始PCM数据
-├── MP3: 压缩音频数据
-└── FLAC: 无损压缩数据
-
-↓ 解码过程
-
-原始PCM (16/24/32-bit) → 格式转换 → 32/64位浮点
-
-↓ DSP处理 (可选)
-
-音效处理 → 均衡器 → 动态范围压缩
-
-↓ 重采样 (如需要)
-
-输入采样率 → 目标采样率 → 插值处理
-
-↓ 输出
-
-音频缓冲区 → 平台API → 音频设备
+1. 音频文件 → 解码器插件 → 原始PCM
+2. PCM → 位深度转换 → 32/64位浮点
+3. 浮点音频 → DSP插件链 → 处理后音频
+4. 处理后音频 → 重采样器 → 目标采样率
+5. 最终音频 → 音频输出插件 → 硬件设备
 ```
 
 ### 配置数据流
-
 ```
-系统启动
-    ↓
-加载默认配置 (default_config.json)
-    ↓
-加载用户配置 (~/.qoder-foobar/config.json)
-    ↓
-应用环境变量覆盖 (QODER_*)
-    ↓
-验证配置有效性
-    ↓
-分发到各模块
-```
-
-## 关键接口
-
-### 1. 插件接口 (IPlugin)
-
-```cpp
-class IPlugin {
-public:
-    virtual ~IPlugin() = default;
-
-    // 生命周期
-    virtual bool initialize() = 0;
-    virtual void shutdown() = 0;
-
-    // 状态管理
-    virtual PluginState get_state() const = 0;
-    virtual void set_state(PluginState state) = 0;
-
-    // 信息
-    virtual PluginInfo get_info() const = 0;
-    virtual std::string get_last_error() const = 0;
-};
-```
-
-### 2. 音频解码器接口 (IAudioDecoder)
-
-```cpp
-class IAudioDecoder : public IPlugin {
-public:
-    // 解码能力
-    virtual bool can_decode(const std::string& file_path) = 0;
-    virtual std::vector<std::string> get_supported_extensions() = 0;
-
-    // 解码操作
-    virtual bool open(const std::string& file_path) = 0;
-    virtual int decode(AudioBuffer& buffer, int max_frames) = 0;
-    virtual void close() = 0;
-
-    // 格式信息
-    virtual AudioFormat get_format() const = 0;
-};
-```
-
-### 3. 配置管理器接口
-
-```cpp
-class ConfigManager {
-public:
-    // 初始化
-    bool initialize(const std::string& config_file = "");
-
-    // 配置操作
-    bool load_config();
-    bool save_config();
-    bool reload_config();
-
-    // 访问配置
-    const AppConfig& get_config() const;
-    AudioConfig& audio();
-    ResamplerConfig& resampler();
-
-    // 通知机制
-    void add_change_callback(std::function<void(const AppConfig&)> callback);
-
-    // 高级功能
-    template<typename T>
-    void set_config_value(const std::string& path, const T& value);
-
-    template<typename T>
-    T get_config_value(const std::string& path, const T& default_value = T{}) const;
-};
+1. 加载默认配置 (config/default_config.json)
+2. 加载系统配置 (/etc/qoder-foobar/config.json)
+3. 加载用户配置 (~/.qoder-foobar/config.json)
+4. 应用环境变量覆盖 (QODER_*)
+5. 验证配置有效性
+6. 分发到各模块并注册变更监听
 ```
 
 ## 线程模型
 
-### 主要线程
-
-1. **主线程**：UI和用户交互
-2. **音频线程**：音频处理和输出
-3. **解码线程**：音频文件解码
-4. **插件管理线程**：插件加载/卸载
-
-### 线程间通信
-
-```cpp
-// 事件总线系统
-EventBus
-├── 主线程事件
-├── 音频线程事件
-├── 插件线程事件
-└── 配置变更事件
-
-// 共享数据保护
-std::mutex audio_mutex;
-std::condition_variable audio_cv;
-std::atomic<bool> is_playing;
+```
+主线程 (UI/控制)
+├── 音频线程 (实时音频处理)
+│   ├── 解码线程池
+│   ├── DSP处理线程
+│   └── 输出线程
+├── 插件管理线程
+│   ├── 插件扫描
+│   ├── 加载/卸载
+│   └── 依赖解析
+└── 文件I/O线程
+    ├── 配置文件读写
+    ├── 日志写入
+    └── 元数据缓存
 ```
 
 ## 内存管理
 
-### RAII原则
-
-所有资源使用RAII管理：
-
+### RAII和智能指针
 ```cpp
 class AudioPlayer {
 private:
     std::unique_ptr<IAudioOutput> output_;
-    std::unique_ptr<PluginManager> plugin_mgr_;
-
-public:
-    ~AudioPlayer() {
-        // 自动清理资源
-    }
+    std::shared_ptr<AudioBuffer> buffer_;
+    std::weak_ptr<PluginManager> plugin_mgr_;
 };
 ```
 
-### 智能指针使用
-
-- `std::unique_ptr`：独占所有权
-- `std::shared_ptr`：共享所有权（音频缓冲区）
-- `std::weak_ptr`：弱引用（避免循环引用）
-
-### 内存池
-
-音频处理使用内存池减少分配开销：
-
+### 音频缓冲区管理
 ```cpp
 class AudioBufferPool {
-private:
-    std::vector<std::unique_ptr<AudioBuffer>> available_;
-    std::mutex mutex_;
-
-public:
     std::unique_ptr<AudioBuffer> acquire(int size);
     void release(std::unique_ptr<AudioBuffer> buffer);
+private:
+    std::queue<std::unique_ptr<AudioBuffer>> available_;
+    std::mutex mutex_;
 };
 ```
 
 ## 错误处理
 
-### Result 类型
-
+### Result类型
 ```cpp
 template<typename T>
 class Result {
-private:
-    T value_;
-    std::string error_;
-    bool has_value_;
-
-public:
     static Result<T> success(T value);
     static Result<T> error(const std::string& error);
-
     bool is_success() const;
     const T& value() const;
     const std::string& error() const;
@@ -360,138 +253,94 @@ public:
 ```
 
 ### 异常策略
-
 - **音频线程**：不抛出异常，返回错误状态
-- **UI线程**：可以抛出异常，由UI层处理
-- **插件层**：异常隔离，不影响主程序
+- **UI线程**：使用try-catch处理用户操作
+- **插件沙箱**：隔离插件异常，记录日志
 
 ## 性能优化
 
 ### 1. SIMD优化
-
-音频处理使用SIMD指令：
-
 ```cpp
 #ifdef __SSE2__
-void process_audio_sse(float* data, int frames);
+void process_audio_sse(float* data, int frames) {
+    // 使用SSE2指令集并行处理
+}
 #endif
 ```
 
-### 2. 零拷贝
+### 2. 零拷贝设计
+- 音频缓冲区使用指针传递
+- 避免不必要的内存拷贝
+- 移动语义优化大对象传递
 
-音频数据传递使用指针或引用：
-
-```cpp
-// 避免：
-std::vector<float> buffer = input_buffer;
-output_buffer = buffer;  // 拷贝
-
-// 推荐：
-output_buffer = input_buffer;  // 移动语义或引用
-```
-
-### 3. 批处理
-
-音频数据批量处理减少函数调用开销：
-
-```cpp
-// 每次处理更多帧
-const int BATCH_SIZE = 4096;
-```
+### 3. 内存预分配
+- 音频缓冲区池化
+- 预分配FFT工作空间
+- 避免实时内存分配
 
 ## 扩展点
 
 ### 1. 新插件类型
-
 ```cpp
-// 添加新的插件类型
 enum class PluginType {
-    Decoder = 1,
-    DSP = 2,
-    Output = 3,
+    AudioDecoder = 1,
+    DSPProcessor = 2,
+    AudioOutput = 3,
     Visualization = 4,
-    Metadata = 5  // 新增
+    MetadataReader = 5,    // 新增
+    PlaylistManager = 6    // 新增
 };
 ```
 
 ### 2. 新音频后端
-
 ```cpp
 // 添加新的平台支持
 #ifdef HAVE_JACK_AUDIO
     #include "platform/jack_audio_output.h"
+    REGISTER_AUDIO_OUTPUT(jack, JackAudioOutput);
+#endif
+
+#ifdef HAVE_PIPEWIRE
+    #include "platform/pipewire_audio_output.h"
+    REGISTER_AUDIO_OUTPUT(pipewire, PipeWireAudioOutput);
 #endif
 ```
 
 ### 3. 新配置模块
-
 ```cpp
-// 添加新的配置节
 struct NetworkConfig {
     bool enable_streaming = false;
     std::string server_url;
     int buffer_size = 32768;
+    int reconnect_timeout = 5000;
 };
 ```
 
-## 测试策略
-
-### 单元测试
-
+### 4. 新DSP效果
 ```cpp
-// 每个组件都有对应的测试
-TEST(AudioDecoderTest, CanDecodeValidFile) {
-    MyDecoder decoder;
-    ASSERT_TRUE(decoder.can_decode("test.wav"));
-}
+class ReverbProcessor : public IDSPProcessor {
+    bool configure(const AudioFormat& format) override;
+    int process(float* input, float* output, int frames) override;
+
+    void set_room_size(double size);
+    void set_damping(double damping);
+    void set_wet_level(double level);
+};
 ```
 
-### 集成测试
+## 构建系统
 
-```cpp
-// 端到端测试
-TEST(AudioPipelineTest, PlayCompleteFile) {
-    AudioPlayer player;
-    EXPECT_TRUE(player.load("test.wav"));
-    EXPECT_TRUE(player.play());
-}
+### CMake模块化设计
+```
+CMakeLists.txt (根)
+├── config/CMakeLists.txt
+├── core/CMakeLists.txt
+├── src/CMakeLists.txt
+├── sdk/CMakeLists.txt
+└── plugins/CMakeLists.txt
 ```
 
-### 性能测试
-
-```cpp
-// 基准测试
-TEST(ResamplerBenchmark, Measure64bitPerformance) {
-    // 测试64位重采样性能
-}
-```
-
-## 部署架构
-
-### 开发环境
-
-```
-开发机器 → Git Repository → CI/CD Pipeline → 构建产物
-                ↓                      ↓
-        本地测试 → 自动化测试 → 发布包
-```
-
-### 生产部署
-
-```
-安装包 → 系统安装 → 配置目录 → 运行实例
-    ↓          ↓            ↓           ↓
-  二进制文件 → 配置文件 → 用户数据 → 进程
-```
-
-## 总结
-
-Qoder foobar v2.0 的架构设计充分考虑了：
-
-1. **可扩展性**：模块化设计便于添加新功能
-2. **可维护性**：清晰的分层架构和接口定义
-3. **性能**：优化的音频处理管道
-4. **灵活性**：丰富的配置选项和插件支持
-5. **兼容性**：跨平台支持和向后兼容
-
-这种架构设计使得系统既能满足当前需求，也为未来的功能扩展奠定了坚实的基础。
+### 依赖管理
+- **必需依赖**：CMake 3.20+, C++17, nlohmann/json
+- **可选依赖**：ALSA, PulseAudio, FFmpeg
+- **自动检测**：cmake/AudioBackend.cmake

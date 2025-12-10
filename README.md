@@ -257,13 +257,6 @@ Memory usage increases by ~2x for 64-bit precision.
 ./build/bin/test-all
 ```
 
-## 📚 Documentation
-
-- [Configuration Guide](docs/CONFIGURATION.md) - Complete configuration reference
-- [Plugin Development Guide](docs/PLUGIN_DEVELOPMENT_GUIDE.md) - Create custom plugins
-- [Architecture Overview](docs/ARCHITECTURE.md) - System design details
-- [Configuration Integration](docs/CONFIGURATION_INTEGRATION.md) - How config is used
-
 ## 🔧 Development
 
 ### Project Structure

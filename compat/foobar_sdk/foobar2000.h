@@ -139,10 +139,11 @@ public:
     virtual ~abort_callback() = default;
 
     virtual void abort() = 0;
-    virtual bool is_aborting() = 0 = 0;
+    virtual bool is_aborting() const = 0;
+    virtual void sleep(double seconds) = 0;
 };
 
-// Audio chunk (multi-value metadata support)
+// Audio chunk (multi-value metadata support) - ABSTRACT INTERFACE
 class audio_chunk {
 public:
     struct sample_spec {
@@ -152,47 +153,133 @@ public:
         uint32_t channel_mask;
     };
 
-    audio_chunk() = default;
-    ~audio_chunk() = default;
+    virtual ~audio_chunk() = default;
 
-    virtual void set_data(const float* data, int samples, const sample_spec& spec) = 0;
+    // Sample rate in Hz
+    virtual uint32_t get_sample_rate() const = 0;
+    virtual void set_sample_rate(uint32_t rate) = 0;
+
+    // Number of channels
+    virtual uint32_t get_channels() const = 0;
+    virtual void set_channels(uint32_t ch) = 0;
+
+    // Channel configuration bitmask
+    virtual uint32_t get_channel_config() const = 0;
+    virtual void set_channel_config(uint32_t config) = 0;
+
+    // Number of samples per channel
+    virtual size_t get_sample_count() const = 0;
+    virtual void set_sample_count(size_t count) = 0;
+
+    // Get audio data pointer
     virtual const float* get_data() const = 0;
-    virtual int get_sample_count() const = 0;
+    virtual float* get_data() = 0;
+
+    // Set data size and allocate if needed
+    virtual void set_data_size(size_t samples_per_channel) = 0;
+
+    // Get duration in seconds
+    virtual double get_duration() const = 0;
+
+    // Reset chunk
+    virtual void reset() = 0;
+
+    // Additional virtual methods expected by foobar2000 API
+    virtual void set_data(const float* p_data, size_t p_samples, uint32_t p_channels, uint32_t p_sample_rate) = 0;
+    virtual size_t get_data_size() const = 0;
+    virtual size_t get_data_bytes() const = 0;
+    virtual float* get_channel_data(uint32_t p_channel) = 0;
+    virtual const float* get_channel_data(uint32_t p_channel) const = 0;
+    virtual void scale(const float& p_scale) = 0;
+    virtual void copy(const audio_chunk& p_source) = 0;
+    virtual bool is_valid() const = 0;
+    virtual bool is_empty() const = 0;
+
+    // Old interface methods (for compatibility)
+    virtual void set_data(const float* data, int samples, const sample_spec& spec) = 0;
     virtual const sample_spec& get_spec() const = 0;
-    virtual void copy(const audio_chunk& other) = 0;
 };
 
-// File information
+// File information - ABSTRACT INTERFACE
 class file_info {
 public:
     virtual ~file_info() = default;
 
-    // Basic info
+    // Basic info management
     virtual void reset() = 0;
     virtual bool is_valid() const = 0;
 
-    // Metadata
+    // Metadata interface
+    virtual const char* meta_get(const char* name, size_t index) const = 0;
+    virtual size_t meta_get_count(const char* name) const = 0;
+    virtual bool meta_set(const char* name, const char* value) = 0;
+    virtual bool meta_add(const char* name, const char* value) = 0;
+    virtual bool meta_remove(const char* name) = 0;
+    virtual void meta_remove_index(const char* name, size_t index) = 0;
+    virtual std::vector<std::string> meta_enumerate() const = 0;
+
+    // Length
+    virtual double get_length() const = 0;
+    virtual void set_length(double length) = 0;
+
+    // Audio properties
+    virtual uint32_t get_sample_rate() const = 0;
+    virtual void set_sample_rate(uint32_t rate) = 0;
+    virtual uint32_t get_channels() const = 0;
+    virtual void set_channels(uint32_t channels) = 0;
+    virtual uint32_t get_bitrate() const = 0;
+    virtual void set_bitrate(uint32_t bitrate) = 0;
+
+    // Codec information
+    virtual const char* get_codec() const = 0;
+    virtual void set_codec(const char* codec) = 0;
+
+    // Copy operations
+    virtual void copy(const file_info& other) = 0;
+    virtual void merge(const file_info& other) = 0;
+
+    // Old interface methods (for compatibility)
     virtual void set_meta(const char* key, const char* value) = 0;
     virtual const char* get_meta(const char* key) const = 0;
     virtual void remove_meta(const char* key) = 0;
-
-    // Length
-    virtual void set_length(int64_t length) = 0;
     virtual int64_t get_length() const = 0;
-
-    // Properties
+    virtual void set_length(int64_t length) = 0;
     virtual void set_property(const char* key, const char* value) = 0;
     virtual const char* get_property(const char* key) const = 0;
 };
 
-// Metadb handle
+// Metadb handle - ABSTRACT INTERFACE
 class metadb_handle {
 public:
     virtual ~metadb_handle() = default;
 
-    virtual bool is_valid() const = 0;
-    virtual void get_info(file_info& info) const = 0;
+    // Get location of the media file
+    virtual const char* get_path() const = 0;
+    virtual const char* get_filename() const = 0;
+    virtual const char* get_directory() const = 0;
+
+    // Get metadata information
+    virtual const file_info& get_info() const = 0;
+    virtual file_info& get_info() = 0;
     virtual void set_info(const file_info& info) = 0;
+
+    // Get file stats
+    virtual uint64_t get_file_size() const = 0;
+    virtual uint64_t get_timestamp() const = 0;
+
+    // Get unique handle hash
+    virtual uint64_t get_location_hash() const = 0;
+
+    // Comparison operators
+    virtual bool is_same(const metadb_handle& other) const = 0;
+    virtual bool is_valid() const = 0;
+
+    // Update from file
+    virtual void reload(abort_callback& p_abort) = 0;
+
+    // Reference counting for the handle
+    virtual void ref_add_ref() = 0;
+    virtual void ref_release() = 0;
 };
 
 // Plugin entry point
@@ -206,7 +293,7 @@ typedef struct {
 // Plugin interface
 class input_factory {
 public:
-    virtual ~input_factory() = 0;
+    virtual ~input_factory() = default;
 
     virtual service_ptr_t<input_decoder> create() = 0;
     virtual bool is_our_path(const char* path) = 0;

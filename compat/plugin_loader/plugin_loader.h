@@ -85,43 +85,43 @@ struct ServiceExportInfo {
 /**
  * @class ServiceFactoryWrapper
  * @brief 包装 foobar2000 服务工厂到我们系统
- * 
+ *
  * 这桥接了 foobar2000 的 service_factory_base 和
  * 我们自己的服务注册表。
  */
-class ServiceFactoryWrapper : public service_factory_base {
+class ServiceFactoryWrapper : public foobar2000_sdk::service_factory_base {
 private:
-    service_factory_base* foobar_factory_;  // 原始的 foobar2000 工厂
-    
+    foobar2000_sdk::service_factory_base* foobar_factory_;  // 原始的 foobar2000 工厂
+
 public:
     /**
      * @brief 构造函数
      * @param foobar_factory foobar2000 服务工厂
      */
-    explicit ServiceFactoryWrapper(service_factory_base* foobar_factory);
-    
+    explicit ServiceFactoryWrapper(foobar2000_sdk::service_factory_base* foobar_factory);
+
     /**
      * @brief 析构函数
      */
     ~ServiceFactoryWrapper() override = default;
-    
+
     /**
      * @brief 创建服务实例
      * @return 服务指针
      */
-    service_ptr create_service() override;
-    
+    foobar2000_sdk::service_ptr create_service() override;
+
     /**
      * @brief 获取服务 GUID
      * @return GUID 引用
      */
     const foobar2000_sdk::GUID& get_guid() const override;
-    
+
     /**
      * @brief 获取原始工厂
      * @return foobar2000 工厂指针
      */
-    service_factory_base* get_original_factory() const { return foobar_factory_; }
+    foobar2000_sdk::service_factory_base* get_original_factory() const { return foobar_factory_; }
 };
 
 /**
@@ -307,7 +307,7 @@ private:
 /**
  * @class ServiceRegistryBridge
  * @brief 桥接 foobar2000 服务到我们的 ServiceRegistry
- * 
+ *
  * 这是使 foobar2000 服务在我们的播放器中可用的关键组件。
  * 它将 foobar2000 的服务模型（基于 GUID）映射到我们的 ServiceRegistry（基于 ServiceID）。
  */
@@ -319,36 +319,47 @@ public:
      * @param factory_wrapper 包装工厂
      * @return Result 成功或错误
      */
-    virtual Result register_service(const GUID& guid, 
+    virtual Result register_service(const foobar2000_sdk::GUID& guid,
                                    ServiceFactoryWrapper* factory_wrapper) = 0;
-    
+
     /**
      * @brief 注销服务
      * @param guid 服务 GUID
      * @return Result 成功或错误
      */
-    virtual Result unregister_service(const GUID& guid) = 0;
-    
+    virtual Result unregister_service(const foobar2000_sdk::GUID& guid) = 0;
+
     /**
      * @brief 按 GUID 查询服务
      * @param guid 服务 GUID
      * @return 服务实例或 nullptr
      */
-    virtual service_ptr query_service(const GUID& guid) = 0;
-    
+    virtual foobar2000_sdk::service_ptr query_service(const foobar2000_sdk::GUID& guid) = 0;
+
     /**
      * @brief 按 GUID 查询工厂
      * @param guid 服务 GUID
      * @return 工厂指针或 nullptr
      */
-    virtual service_factory_base* query_factory(const GUID& guid) = 0;
-    
+    virtual foobar2000_sdk::service_factory_base* query_factory(const foobar2000_sdk::GUID& guid) = 0;
+
     /**
      * @brief 获取所有已注册服务
      * @return GUID 向量
      */
-    virtual std::vector<GUID> get_registered_services() const = 0;
-    
+    virtual std::vector<foobar2000_sdk::GUID> get_registered_services() const = 0;
+
+    /**
+     * @brief 获取服务数量
+     * @return 服务数量
+     */
+    virtual size_t get_service_count() const = 0;
+
+    /**
+     * @brief 清除所有服务
+     */
+    virtual void clear() = 0;
+
     /**
      * @brief 虚拟析构函数
      */
